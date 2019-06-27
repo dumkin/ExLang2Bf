@@ -70,9 +70,11 @@ function convert(src) {
     }
 
     var memoryIndexes = [];
+    var chars = [];
     for (let i = 0; i < value.length; i++) {
       const memoryIndex = getMemoryFreeIndex();
       memoryIndexes.push(memoryIndex);
+      chars.push(value.charCodeAt(i));
       memory[memoryIndex] = value.charCodeAt(i);
     }
 
@@ -81,10 +83,7 @@ function convert(src) {
       type: "string"
     };
 
-    for (let i = 0; i < value.length; i++) {
-      getMemoryFromIndex(memoryIndexes[i]);
-      writeMemoryOptimized(value.charCodeAt(i));
-    }
+    writeMemoryArrayOptimized(chars, memoryIndexes);
   }
   var writeMemoryLinear = (value) => {
     for (let i = 0; i < value; i++) {
@@ -117,6 +116,29 @@ function convert(src) {
     getMemoryFromIndex(slotBefore);
     for (let i = 0; i < remainder; i++) {
       result += "+"
+    }
+  }
+  var writeMemoryArrayOptimized = (arr, indexes) => {
+    const min = Math.min(...arr);
+
+    const variableTemp = `translator_temp_line_${getTempIndex()}`;
+    createVar(variableTemp, min)
+    var slot = variables[variableTemp].memoryIndex;
+
+    getMemoryFromIndex(slot);
+
+    result += "["
+    for (let i = 0; i < arr.length; i++) {
+      getMemoryFromIndex(indexes[i]);
+      result += "+";
+    }
+    getMemoryFromIndex(slot);
+    result += "-";
+    result += "]";
+    
+    for (let i = 0; i < arr.length; i++) {
+      getMemoryFromIndex(indexes[i]);
+      writeMemoryOptimized(arr[i] - min)
     }
   }
   var AreEqual = (left, right) => {
