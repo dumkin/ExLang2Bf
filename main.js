@@ -9,19 +9,18 @@ function convert(src) {
 
   var variables = {};
   var memory = {};
-  var currentOperator = 0;
   var currentMemoryPointer = 0;
 
-  var getEmptySlot = () => {
-    const len = Object.keys(memory).length;
-    for (let i = 0; i < len; i++) {
+  var getMemoryFreeIndex = () => {
+    const length = Object.keys(memory).length;
+    for (let i = 0; i < length; i++) {
       if (!(i in memory)) {
         return i;
       }
     }
-    return len;
+    return length;
   }
-  var moveToMemory = (to) => {
+  var getMemoryFromIndex = (to) => {
     for (let i = 0; i < Math.abs(currentMemoryPointer - to); i++) {
       if (currentMemoryPointer - to < 0) {
         result += ">";
@@ -32,56 +31,75 @@ function convert(src) {
     currentMemoryPointer = to;
   }
   var createVar = (key, value) => {
-    const slot = getEmptySlot();
-
-    variables[key] = {
-      slot: slot,
-      value: value,
-      type: "number"
-    };
-    memory[slot] = value;
-
-    moveToMemory(slot);
-    writeToMemoryOptimized(value);
+    switch (typeof value) {
+      case "number":
+        createVar_Int8(key, value);
+        break;
+      case "string":
+        createVar_String(key, value);
+        break;
+      default:
+        throw `unsupported type (${value})`;
+    }
   }
-  var createVarString = (key, value) => {
-    var slots = [];
+  var createVar_Int8 = (name, value) => {
+    if (!Number.isInteger(value)) {
+      throw `variable int8 is not a integer - name: ${name}, value: ${value}`;
+    }
+
+    const valueNormalized = value % 256;
+    const memoryIndex = getMemoryFreeIndex();
+
+    variables[name] = {
+      memoryIndex: memoryIndex,
+      type: "int8"
+    };
+    memory[memoryIndex] = valueNormalized;
+
+    getMemoryFromIndex(memoryIndex);
+    writeMemoryOptimized(valueNormalized);
+  }
+  var createVar_String = (key, value) => {
+    if (typeof value !== "string") {
+      throw `variable ${name} is not string (${value})`;
+    }
+
+    var memoryIndexes = [];
     for (let i = 0; i < value.length; i++) {
-      var slot = getEmptySlot();
-      slots.push(slot);
-      memory[slot] = value[i];
+      const memoryIndex = getMemoryFreeIndex();
+      memoryIndexes.push(memoryIndex);
+      memory[memoryIndex] = value.charCodeAt(i);
     }
 
     variables[key] = {
-      slot: slots,
-      value: value,
+      memoryIndex: memoryIndexes,
       type: "string"
     };
 
     for (let i = 0; i < value.length; i++) {
-      moveToMemory(slots[i]);
-      writeToMemoryOptimized(value.charCodeAt(i));
+      getMemoryFromIndex(memoryIndexes[i]);
+      writeMemoryOptimized(value.charCodeAt(i));
     }
   }
-  var writeToMemoryOptimized = (value) => {
+  var writeMemoryOptimized = (value) => {
     var quotient = Math.floor(value / 10);
     var remainder = value % 10;
 
     const slotBefore = currentMemoryPointer;
-    const slot = getEmptySlot();
-    moveToMemory(slot);
+    const slot = getMemoryFreeIndex();
+    getMemoryFromIndex(slot);
     for (let i = 0; i < quotient; i++) {
       result += "+"
     }
     result += "["
     result += "-"
-    moveToMemory(slotBefore);
+    getMemoryFromIndex(slotBefore);
     for (let i = 0; i < 10; i++) {
       result += "+"
     }
-    moveToMemory(slot);
+    getMemoryFromIndex(slot);
     result += "]"
-    moveToMemory(slotBefore);
+    getMemoryFromIndex(slotBefore);
     for (let i = 0; i < remainder; i++) {
       result += "+"
     }
@@ -89,13 +107,13 @@ function convert(src) {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
-    if (line == "") {
+    if (line == "" || (line[0] == "/" && line[1] == "/")) {
       continue;
     }
-    var operators = line.split(" ");
+    const operators = line.split(" ");
 
     if (operators.length < 1) {
-      return `Error: empty zero operator in ${i + 1} line.`;
+      return `Error: missing operator in ${i + 1} line.`;
     }
 
     switch (operators[0]) {
@@ -104,10 +122,12 @@ function convert(src) {
           createVar(operators[1], 0)
         } else if (operators.length == 3) {
           if (!isNaN(operators[2])) {
-            createVar(operators[1], operators[2])
-          } else {
-            createVarString(operators[1], operators[2])
+            operators[2] = Number(operators[2]);
           }
+          console.log(`var ${operators[2]} is ${typeof operators[2]} type`);
+          createVar(operators[1], operators[2])
+        } else {
+          return `Error: wrong number of parameters in ${operators[0]} operator in ${i + 1} line.`;
         }
         break;
       case "add":
@@ -120,18 +140,17 @@ function convert(src) {
           }
 
           const variableTemp = `translator_temp_line_${i + 1}`;
-          createVar(variableTemp, variableAdd.value)
+          createVar(variableTemp, memory[variableAdd.memoryIndex])
 
-          variable.value += variableAdd.value;
-          memory[variable.slot] = variable.value;
+          memory[variable.memoryIndex] += memory[variableAdd.memoryIndex];
 
-          var indexSlot = variables[variableTemp].slot;
-          moveToMemory(indexSlot);
+          var indexSlot = variables[variableTemp].memoryIndex;
+          getMemoryFromIndex(indexSlot);
           result += "[";
           result += "-";
-          moveToMemory(variable.slot);
+          getMemoryFromIndex(variable.memoryIndex);
           result += "+";
-          moveToMemory(indexSlot);
+          getMemoryFromIndex(indexSlot);
           result += "]";
           delete variables[variableTemp];
         }
@@ -141,12 +160,12 @@ function convert(src) {
           const variable = operators[1];
 
           if (variables[variable].type == "number") {
-            moveToMemory(variables[variable].slot);
+            getMemoryFromIndex(variables[variable].memoryIndex);
             result += ".";
           } else if (variables[variable].type == "string") {
-            for (let i = 0; i < variables[variable].slot.length; i++) {
-              const e = variables[variable].slot[i];
-              moveToMemory(e);
+            for (let i = 0; i < variables[variable].memoryIndex.length; i++) {
+              const e = variables[variable].memoryIndex[i];
+              getMemoryFromIndex(e);
               result += ".";
             }
           }
@@ -154,8 +173,7 @@ function convert(src) {
         break;
 
       default:
-        return `Error: undifined zero operator in ${i + 1} line.`;
-        break;
+        return `Error: undefined ${operators[0]} operator in ${i + 1} line.`;
     }
   }
   return result;
