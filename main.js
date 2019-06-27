@@ -7,10 +7,15 @@ function convert(src) {
   var lines = src.split("\n");
   var result = "";
 
+  var tempIndex = 0;
   var variables = {};
   var memory = {};
   var currentMemoryPointer = 0;
+  var stackPointers = [];
 
+  var getTempIndex = () => {
+    return tempIndex++;
+  }
   var getMemoryFreeIndex = () => {
     const length = Object.keys(memory).length;
     for (let i = 0; i < length; i++) {
@@ -104,6 +109,36 @@ function convert(src) {
       result += "+"
     }
   }
+  var AreEqual = (left, right) => {
+    const leftCopyName = `translator_temp_bool_${getTempIndex()}`;
+    createVar(leftCopyName, memory[left.memoryIndex])
+    var leftCopy = variables[leftCopyName];
+
+    const rightCopyName = `translator_temp_${getTempIndex()}_right_copy`;
+    createVar(rightCopyName, memory[right.memoryIndex])
+    var rightCopy = variables[rightCopyName];
+
+    getMemoryFromIndex(leftCopy.memoryIndex);
+    result += "[";
+    result += "-";
+    getMemoryFromIndex(rightCopy.memoryIndex);
+    result += "-";
+    getMemoryFromIndex(leftCopy.memoryIndex);
+    result += "]";
+    result += "+";
+    getMemoryFromIndex(rightCopy.memoryIndex);
+    result += "[";
+    getMemoryFromIndex(leftCopy.memoryIndex);
+    result += "-";
+    getMemoryFromIndex(rightCopy.memoryIndex);
+    result += "[";
+    result += "-";
+    result += "]";
+    result += "]";
+
+    delete variables[rightCopyName];
+    return leftCopyName;
+  }
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -170,6 +205,37 @@ function convert(src) {
             }
           }
         }
+        break;
+      case "if":
+        if (operators.length == 4) {
+          const left = variables[operators[1]];
+          const op = operators[2];
+          const right = variables[operators[3]];
+
+          if (left.type != right.type) {
+            return `Error: different types on ${i + 1} line.`;
+          }
+
+          switch (op) {
+            case "=":
+              const boolName = AreEqual(left, right)
+              var bool = variables[boolName];
+
+              getMemoryFromIndex(bool.memoryIndex);
+              result += "[";
+              stackPointers.push(bool.memoryIndex);
+              break;
+
+            default:
+              break;
+          }
+        }
+        break;
+      case "endif":
+        getMemoryFromIndex(stackPointers[stackPointers.length - 1]);
+        stackPointers.pop();
+        result += "-";
+        result += "]";
         break;
 
       default:
