@@ -86,7 +86,17 @@ function convert(src) {
       writeMemoryOptimized(value.charCodeAt(i));
     }
   }
+  var writeMemoryLinear = (value) => {
+    for (let i = 0; i < value; i++) {
+      result += "+"
+    }
+  }
   var writeMemoryOptimized = (value) => {
+    if (value < 11) {
+      writeMemoryLinear(value);
+      return;
+    }
+
     var quotient = Math.floor(value / 10);
     var remainder = value % 10;
 
