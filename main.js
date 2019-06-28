@@ -48,6 +48,19 @@ function convert(src) {
         throw `unsupported type (${value})`;
     }
   }
+  var deleteVar = (name) => {
+    // const beforeIndex = currentMemoryPointer;
+
+    // result += "before";
+    // getMemoryFromIndex(variables[name].memoryIndex)
+    // result += "[-]";
+
+    delete variables[name];
+    delete memory[name];
+
+    //getMemoryFromIndex(beforeIndex)
+    //result += "after";
+  }
   var createVarCopy = (name) => {
     const copyName = `translator_temp_${getTempIndex()}_${name}_copy`;
     const newOrigName = `translator_temp_${getTempIndex()}_${name}_copy`;
@@ -69,11 +82,12 @@ function convert(src) {
     result += "-";
     result += "]";
 
-    memory[newOrig.memoryIndex] = memory[orig.memoryIndex];
-    memory[copy.memoryIndex] = memory[orig.memoryIndex];
+    memory[newOrig.memoryIndex] = true;
+    memory[copy.memoryIndex] = true;
 
     orig.memoryIndex = newOrig.memoryIndex;
-    delete variables[newOrigName];
+
+    deleteVar(newOrigName);
 
     return copyName;
   }
@@ -106,9 +120,9 @@ function convert(src) {
     result += "-";
     result += "]";
 
-    memory[copy.memoryIndex] = memory[orig.memoryIndex];
+    memory[copy.memoryIndex] = true;
 
-    delete variables[copyTempName];
+    deleteVar(copyTempName);
 
     return copyName;
   }
@@ -124,7 +138,7 @@ function convert(src) {
       memoryIndex: memoryIndex,
       type: "int8"
     };
-    memory[memoryIndex] = valueNormalized;
+    memory[memoryIndex] = true;
 
     getMemoryFromIndex(memoryIndex);
     writeMemoryOptimized(valueNormalized);
@@ -140,7 +154,7 @@ function convert(src) {
       const memoryIndex = getMemoryFreeIndex();
       memoryIndexes.push(memoryIndex);
       chars.push(value.charCodeAt(i));
-      memory[memoryIndex] = value.charCodeAt(i);
+      memory[memoryIndex] = true;
     }
 
     variables[key] = {
@@ -205,23 +219,18 @@ function convert(src) {
       getMemoryFromIndex(indexes[i]);
       writeMemoryOptimized(arr[i] - min)
     }
+    deleteVar(variableTemp);
   }
   var AreEqual = (left, right) => {
-    // const leftCopyName = `translator_temp_bool_${getTempIndex()}`;
-    // createVar(leftCopyName, memory[left.memoryIndex])
     var leftCopyName = createVarCopyPointersSafe(left);
     var leftCopy = variables[leftCopyName];
     
-
-    // const rightCopyName = `translator_temp_${getTempIndex()}_right_copy`;
-    // createVar(rightCopyName, memory[right.memoryIndex])
     var rightCopyName = createVarCopyPointersSafe(right);
     var rightCopy = variables[rightCopyName];
 
     getMemoryFromIndex(leftCopy.memoryIndex);
-    result += "#[";
+    result += "[";
     result += "-";
-    result += "#";
     getMemoryFromIndex(rightCopy.memoryIndex);
     result += "-";
     getMemoryFromIndex(leftCopy.memoryIndex);
@@ -237,7 +246,8 @@ function convert(src) {
     result += "]";
     result += "]";
 
-    delete variables[rightCopyName];
+    deleteVar(rightCopyName);
+    
     return leftCopyName;
   }
 
@@ -276,11 +286,9 @@ function convert(src) {
             return `Error: different types on ${i + 1} line.`;
           }
 
-          // const variableTemp = `translator_temp_line_${i + 1}`;
-          // createVar(variableTemp, memory[variableAdd.memoryIndex])
           var copy = createVarCopyPointersSafe(operators[2]);
 
-          memory[variable.memoryIndex] += memory[variableAdd.memoryIndex];
+          memory[variable.memoryIndex] = true;
 
           var indexSlot = variables[copy].memoryIndex;
           getMemoryFromIndex(indexSlot);
@@ -290,7 +298,8 @@ function convert(src) {
           result += "+";
           getMemoryFromIndex(indexSlot);
           result += "]";
-          delete variables[copy];
+
+          deleteVar(copy);
         }
         break;
       }
@@ -327,8 +336,11 @@ function convert(src) {
               var bool = variables[boolName];
 
               getMemoryFromIndex(bool.memoryIndex);
-              result += "#[";
-              stackPointers.push(bool.memoryIndex);
+              result += "[";
+              stackPointers.push({
+                ind: bool.memoryIndex,
+                name: boolName,
+              });
               break;
 
             default:
@@ -338,7 +350,10 @@ function convert(src) {
         break;
       }
       case "endif": {
-        getMemoryFromIndex(stackPointers[stackPointers.length - 1]);
+        index = stackPointers[stackPointers.length - 1];
+
+        getMemoryFromIndex(index.ind);
+        deleteVar(index.name);
         stackPointers.pop();
         result += "-";
         result += "]";
@@ -358,15 +373,21 @@ function convert(src) {
 
           getMemoryFromIndex(indexator.memoryIndex);
           result += "[";
-          stackPointers.push(indexator.memoryIndex);
+          stackPointers.push({
+            ind: indexator.memoryIndex,
+            name: varIndex,
+          });
         }
         break;
       }
       case "endfor": {
-        getMemoryFromIndex(stackPointers[stackPointers.length - 1]);
+        index = stackPointers[stackPointers.length - 1];
+
+        getMemoryFromIndex(index.ind);
+        deleteVar(index.name);
         stackPointers.pop();
         result += "-";
-        result += "#]";
+        result += "]";
         break;
       }
       default: {
