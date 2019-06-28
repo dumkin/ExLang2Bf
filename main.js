@@ -3,6 +3,7 @@ var buttonConvert = document.querySelector("#convert").onclick = function () {
   var bf = convert(src);
   document.querySelector("#bf").value = bf;
 }
+
 function convert(src) {
   var lines = src.split("\n");
   var result = "";
@@ -73,6 +74,41 @@ function convert(src) {
 
     orig.memoryIndex = newOrig.memoryIndex;
     delete variables[newOrigName];
+
+    return copyName;
+  }
+  var createVarCopyPointersSafe = (name) => {
+    const copyName = `translator_temp_${getTempIndex()}_${name}_copy`;
+    const copyTempName = `translator_temp_${getTempIndex()}_${name}_copy`;
+
+    createVar(copyName, 0);
+    createVar(copyTempName, 0);
+
+    var orig = variables[name];
+    var copy = variables[copyName];
+    var copyTemp = variables[copyTempName];
+
+    getMemoryFromIndex(orig.memoryIndex);
+    result += "[";
+    getMemoryFromIndex(copy.memoryIndex);
+    result += "+";
+    getMemoryFromIndex(copyTemp.memoryIndex);
+    result += "+";
+    getMemoryFromIndex(orig.memoryIndex);
+    result += "-";
+    result += "]";
+
+    getMemoryFromIndex(copyTemp.memoryIndex);
+    result += "[";
+    getMemoryFromIndex(orig.memoryIndex);
+    result += "+";
+    getMemoryFromIndex(copyTemp.memoryIndex);
+    result += "-";
+    result += "]";
+
+    memory[copy.memoryIndex] = memory[orig.memoryIndex];
+
+    delete variables[copyTempName];
 
     return copyName;
   }
@@ -171,17 +207,21 @@ function convert(src) {
     }
   }
   var AreEqual = (left, right) => {
-    const leftCopyName = `translator_temp_bool_${getTempIndex()}`;
-    createVar(leftCopyName, memory[left.memoryIndex])
+    // const leftCopyName = `translator_temp_bool_${getTempIndex()}`;
+    // createVar(leftCopyName, memory[left.memoryIndex])
+    var leftCopyName = createVarCopyPointersSafe(left);
     var leftCopy = variables[leftCopyName];
+    
 
-    const rightCopyName = `translator_temp_${getTempIndex()}_right_copy`;
-    createVar(rightCopyName, memory[right.memoryIndex])
+    // const rightCopyName = `translator_temp_${getTempIndex()}_right_copy`;
+    // createVar(rightCopyName, memory[right.memoryIndex])
+    var rightCopyName = createVarCopyPointersSafe(right);
     var rightCopy = variables[rightCopyName];
 
     getMemoryFromIndex(leftCopy.memoryIndex);
-    result += "[";
+    result += "#[";
     result += "-";
+    result += "#";
     getMemoryFromIndex(rightCopy.memoryIndex);
     result += "-";
     getMemoryFromIndex(leftCopy.memoryIndex);
@@ -213,7 +253,7 @@ function convert(src) {
     }
 
     switch (operators[0]) {
-      case "var":
+      case "var": {
         if (operators.length == 2) {
           createVar(operators[1], 0)
         } else if (operators.length == 3) {
@@ -226,7 +266,8 @@ function convert(src) {
           return `Error: wrong number of parameters in ${operators[0]} operator in ${i + 1} line.`;
         }
         break;
-      case "add":
+      }
+      case "add": {
         if (operators.length == 3) {
           const variable = variables[operators[1]];
           const variableAdd = variables[operators[2]];
@@ -237,7 +278,7 @@ function convert(src) {
 
           // const variableTemp = `translator_temp_line_${i + 1}`;
           // createVar(variableTemp, memory[variableAdd.memoryIndex])
-          var copy = createVarCopy(operators[2]);
+          var copy = createVarCopyPointersSafe(operators[2]);
 
           memory[variable.memoryIndex] += memory[variableAdd.memoryIndex];
 
@@ -252,7 +293,8 @@ function convert(src) {
           delete variables[copy];
         }
         break;
-      case "out":
+      }
+      case "out": {
         if (operators.length == 2) {
           const variable = operators[1];
 
@@ -268,7 +310,8 @@ function convert(src) {
           }
         }
         break;
-      case "if":
+      }
+      case "if": {
         if (operators.length == 4) {
           const left = variables[operators[1]];
           const op = operators[2];
@@ -280,11 +323,11 @@ function convert(src) {
 
           switch (op) {
             case "=":
-              const boolName = AreEqual(left, right)
+              const boolName = AreEqual(operators[1], operators[3])
               var bool = variables[boolName];
 
               getMemoryFromIndex(bool.memoryIndex);
-              result += "[";
+              result += "#[";
               stackPointers.push(bool.memoryIndex);
               break;
 
@@ -293,15 +336,42 @@ function convert(src) {
           }
         }
         break;
-      case "endif":
+      }
+      case "endif": {
         getMemoryFromIndex(stackPointers[stackPointers.length - 1]);
         stackPointers.pop();
         result += "-";
         result += "]";
         break;
+      }
+      case "for": {
+        if (operators.length == 2) {
+          const n = operators[1];
 
-      default:
+          if (isNaN(n)) {
+            throw `Error: for index type not int8 on ${i + 1} line.`;
+          }
+
+          const varIndex = `translator_for_index_line_${i + 1}`;
+          createVar(varIndex, Number(n));
+          var indexator = variables[varIndex];
+
+          getMemoryFromIndex(indexator.memoryIndex);
+          result += "[";
+          stackPointers.push(indexator.memoryIndex);
+        }
+        break;
+      }
+      case "endfor": {
+        getMemoryFromIndex(stackPointers[stackPointers.length - 1]);
+        stackPointers.pop();
+        result += "-";
+        result += "#]";
+        break;
+      }
+      default: {
         return `Error: undefined ${operators[0]} operator in ${i + 1} line.`;
+      }
     }
   }
   return result;
