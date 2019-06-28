@@ -47,6 +47,35 @@ function convert(src) {
         throw `unsupported type (${value})`;
     }
   }
+  var createVarCopy = (name) => {
+    const copyName = `translator_temp_${getTempIndex()}_${name}_copy`;
+    const newOrigName = `translator_temp_${getTempIndex()}_${name}_copy`;
+
+    createVar(copyName, 0);
+    createVar(newOrigName, 0);
+
+    var orig = variables[name];
+    var copy = variables[copyName];
+    var newOrig = variables[newOrigName];
+
+    getMemoryFromIndex(orig.memoryIndex);
+    result += "[";
+    getMemoryFromIndex(copy.memoryIndex);
+    result += "+";
+    getMemoryFromIndex(newOrig.memoryIndex);
+    result += "+";
+    getMemoryFromIndex(orig.memoryIndex);
+    result += "-";
+    result += "]";
+
+    memory[newOrig.memoryIndex] = memory[orig.memoryIndex];
+    memory[copy.memoryIndex] = memory[orig.memoryIndex];
+
+    orig.memoryIndex = newOrig.memoryIndex;
+    delete variables[newOrigName];
+
+    return copyName;
+  }
   var createVar_Int8 = (name, value) => {
     if (!Number.isInteger(value)) {
       throw `variable int8 is not a integer - name: ${name}, value: ${value}`;
@@ -135,7 +164,7 @@ function convert(src) {
     getMemoryFromIndex(slot);
     result += "-";
     result += "]";
-    
+
     for (let i = 0; i < arr.length; i++) {
       getMemoryFromIndex(indexes[i]);
       writeMemoryOptimized(arr[i] - min)
@@ -206,12 +235,13 @@ function convert(src) {
             return `Error: different types on ${i + 1} line.`;
           }
 
-          const variableTemp = `translator_temp_line_${i + 1}`;
-          createVar(variableTemp, memory[variableAdd.memoryIndex])
+          // const variableTemp = `translator_temp_line_${i + 1}`;
+          // createVar(variableTemp, memory[variableAdd.memoryIndex])
+          var copy = createVarCopy(operators[2]);
 
           memory[variable.memoryIndex] += memory[variableAdd.memoryIndex];
 
-          var indexSlot = variables[variableTemp].memoryIndex;
+          var indexSlot = variables[copy].memoryIndex;
           getMemoryFromIndex(indexSlot);
           result += "[";
           result += "-";
@@ -219,7 +249,7 @@ function convert(src) {
           result += "+";
           getMemoryFromIndex(indexSlot);
           result += "]";
-          delete variables[variableTemp];
+          delete variables[copy];
         }
         break;
       case "out":
