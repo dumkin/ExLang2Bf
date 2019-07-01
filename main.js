@@ -1,4 +1,4 @@
-var buttonConvert = document.querySelector("#convert").onclick = function () {
+document.querySelector("#convert").onclick = function () {
   var src = document.querySelector("#src").value;
   var bf = convert(src);
   document.querySelector("#bf").value = bf;
@@ -224,7 +224,7 @@ function convert(src) {
   var AreEqual = (left, right) => {
     var leftCopyName = createVarCopyPointersSafe(left);
     var leftCopy = variables[leftCopyName];
-    
+
     var rightCopyName = createVarCopyPointersSafe(right);
     var rightCopy = variables[rightCopyName];
 
@@ -247,7 +247,7 @@ function convert(src) {
     result += "]";
 
     deleteVar(rightCopyName);
-    
+
     return leftCopyName;
   }
 
@@ -396,4 +396,306 @@ function convert(src) {
     }
   }
   return result;
+}
+
+document.querySelector("#convert_new").onclick = function () {
+  var src = document.querySelector("#src_new").value;
+  var bf = convert_new(src);
+  document.querySelector("#bf_new").value = bf;
+}
+
+function convert_new(src) {
+  console.log(src);
+
+  tokens = [];
+  index = 0;
+
+  while (src.length > index) {
+    token = getToken(src, index);
+    index = token.next;
+    tokens.push(token);
+  }
+
+  console.log(tokens);
+
+  let tree = generateTree(tokens);
+
+  console.log(printTree(tree));
+
+  // return src;
+  return printTree(tree);
+}
+
+var iota_data = 0;
+var iota = (offset = -1) => {
+  if (offset !== -1) {
+    iota_data = offset;
+  }
+  return iota_data++;
+}
+
+const Tokens = {
+  "fun": iota(0),
+  "main": iota(),
+  "brace_open": iota(),
+  "brace_close": iota(),
+  "paren_open": iota(),
+  "paren_close": iota(),
+  "semicolon": iota(),
+  "assign": iota(),
+  "identifier": iota(),
+  "number": iota(),
+  "int": iota(),
+  "end": iota()
+};
+
+function getToken(code, index) {
+  result = {
+    index: index,
+    next: index + 1,
+    token: "undefined",
+    value: ""
+  };
+
+  while (code.length > index && isSpace(code[index])) {
+    index++;
+    continue;
+  }
+
+  if (code.length == index) {
+    result.next = code.length;
+    result.token = "end";
+    return result;
+  }
+
+  if (code[index] == '{') {
+    result.next = index + 1;
+    result.token = "brace_open";
+    return result;
+  }
+
+  if (code[index] == '}') {
+    result.next = index + 1;
+    result.token = "brace_close";
+    return result;
+  }
+
+  if (code[index] == '(') {
+    result.next = index + 1;
+    result.token = "paren_open";
+    return result;
+  }
+
+  if (code[index] == ')') {
+    result.next = index + 1;
+    result.token = "paren_close";
+    return result;
+  }
+
+  if (code[index] == ';') {
+    result.next = index + 1;
+    result.token = "semicolon";
+    return result;
+  }
+
+  if (code[index] == '=') {
+    result.next = index + 1;
+    result.token = "assign";
+    return result;
+  }
+
+  if (isIdentifier(code[index])) {
+    let offset = 0;
+    let value = code[index];
+
+    do {
+      offset++;
+      value += code[index + offset];
+    } while (code.length > index + offset && isIdentifier(code[index + offset]));
+    value = value.slice(0, -1);
+
+    result.next = index + offset;
+
+    if (value == "fun") {
+      result.token = "fun";
+      return result;
+    }
+
+    if (value == "int") {
+      result.token = "int";
+      return result;
+    }
+
+    if (value == "main") {
+      result.token = "main";
+      return result;
+    }
+
+    result.token = "identifier";
+    result.value = value;
+    return result;
+  }
+
+  if (isNumber(code[index])) {
+    let offset = 0;
+    let value = code[index];
+
+    do {
+      offset++;
+      value += code[index + offset];
+    } while (code.length > index + offset && isNumber(code[index + offset]));
+    value = value.slice(0, -1);
+
+    result.next = index + offset;
+
+    result.token = "number";
+    result.value = value;
+    return result;
+  }
+
+  throw "unexpected syntax";
+}
+
+function isSpace(char) {
+  return /(\t| |\n)/.test(char);
+}
+
+function isIdentifier(str) {
+  return /[a-zA-Z]/.test(str);
+}
+
+function isNumber(str) {
+  return /[0-9]/.test(str);
+}
+
+function printSubTree(tree, indent, root) {
+  const ConnectChar = "|";
+  const MiddleChar = "*";
+  const LastChar = "-";
+
+  if (tree == null) {
+    return "";
+  }
+
+  let result = indent;
+
+  if (!root) {
+    let index = tree.parent.childs.indexOf(tree);
+    // if (tree.index < tree.parent.childs.length - 1) {
+    if (index < tree.parent.childs.length - 1) {
+      result += MiddleChar + " ";
+      indent += ConnectChar + " ";
+    } else {
+      result += LastChar + " ";
+      indent += " ";
+    }
+  }
+
+  result += tree.type + `(${tree.text})` + "\n";
+  for (let i = 0; i < tree.childs.length; i++) {
+    result += printSubTree(tree.GetChild(i), indent, false);
+  }
+  return result;
+}
+
+function printTree(tree) {
+  return printSubTree(tree, "", true);
+}
+
+class AstNode {
+  type;
+  text;
+  parent = null;
+  childs = [];
+
+  constructor(type, text, child1, child2) {
+    this.type = type;
+    this.text = text;
+
+    if (child1 != null) {
+      this.AddChild(child1);
+    }
+    if (child2 != null) {
+      this.AddChild(child2);
+    }
+  }
+
+  AddChild(child) {
+    if (child == null) {
+      return;
+    }
+    if (child.parent != null) {
+      // child.parent.childs.Remove(child);
+      delete child.parent.childs[child];
+    }
+    delete this.childs[child];
+    this.childs.push(child);
+    child.parent = this;
+  }
+
+  RemoveChild(child) {
+    delete this.childs[child];
+    if (child.parent == this) {
+      child.parent = null;
+    }
+  }
+
+  GetChild(index) {
+    return this.childs[index];
+  }
+}
+
+function generateTree(tokens) {
+  let root = new AstNode("root", "", null, null);
+  for (let i = 0; i < tokens.length; i++) {
+    let tree = Expr(tokens, i);
+    i = tree.next;
+    root.AddChild(tree.node);
+  }
+  return root;
+}
+
+function Expr(tokens, index) {
+  switch (tokens[index].token) {
+    case "fun": {
+      let idenToken = tokens[index + 1];
+      idenToken.value = "main";
+      if (tokens[index + 2].token != "paren_open") {
+        throw "error paren_open";
+      }
+      // TODO: params
+      let offset = 1;
+      while (tokens[index + offset].token != "paren_close") {
+        offset++;
+      }
+      if (tokens[index + offset + 1].token != "brace_open") {
+        throw "error brace_open";
+      }
+      let body = Expr(tokens, index + offset + 2);
+      let iden = new AstNode("iden", idenToken.value, null, null);
+      // let val = new AstNode("body", body.node.value, null, null);
+
+      return {
+        node: new AstNode("fun", "", iden, body.node),
+        next: body.next
+      };
+    }
+    case "int": {
+      let idenToken = tokens[index + 1];
+      let valToken = tokens[index + 3];
+      let iden = new AstNode("iden", idenToken.value, null, null);
+      let val = new AstNode("val", valToken.value, null, null);
+
+      return {
+        node: new AstNode("assign", "int", iden, val),
+        next: index + 4
+      };
+    }
+    default:
+      return {
+        // node:  new AstNode("empty", "", null, null),
+        node: null,
+        next: index + 1
+      };
+  }
 }
