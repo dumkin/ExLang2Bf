@@ -420,13 +420,10 @@ function convert_new(src) {
 
   let tree = generateTree(tokens);
 
-  printTree(tree);
+  console.log(printTree(tree));
 
-  // var root = new AstNode("type", "test", null, null);
-  // root.AddChild(new AstNode("child", "lol", null, null));
-  // printTree(root);
-
-  return src;
+  // return src;
+  return printTree(tree);
 }
 
 var iota_data = 0;
@@ -467,43 +464,43 @@ function getToken(code, index) {
 
   if (code.length == index) {
     result.next = code.length;
-    result.token = /*Tokens[*/"end"/*]*/;
+    result.token = "end";
     return result;
   }
 
   if (code[index] == '{') {
     result.next = index + 1;
-    result.token = /*Tokens[*/"brace_open"/*]*/;
+    result.token = "brace_open";
     return result;
   }
 
   if (code[index] == '}') {
     result.next = index + 1;
-    result.token = /*Tokens[*/"brace_close"/*]*/;
+    result.token = "brace_close";
     return result;
   }
 
   if (code[index] == '(') {
     result.next = index + 1;
-    result.token = /*Tokens[*/"paren_open"/*]*/;
+    result.token = "paren_open";
     return result;
   }
 
   if (code[index] == ')') {
     result.next = index + 1;
-    result.token = /*Tokens[*/"paren_close"/*]*/;
+    result.token = "paren_close";
     return result;
   }
 
   if (code[index] == ';') {
     result.next = index + 1;
-    result.token = /*Tokens[*/"semicolon"/*]*/;
+    result.token = "semicolon";
     return result;
   }
 
   if (code[index] == '=') {
     result.next = index + 1;
-    result.token = /*Tokens[*/"assign"/*]*/;
+    result.token = "assign";
     return result;
   }
 
@@ -520,21 +517,21 @@ function getToken(code, index) {
     result.next = index + offset;
 
     if (value == "fun") {
-      result.token = /*Tokens[*/"fun"/*]*/;
+      result.token = "fun";
       return result;
     }
 
     if (value == "int") {
-      result.token = /*Tokens[*/"int"/*]*/;
+      result.token = "int";
       return result;
     }
 
     if (value == "main") {
-      result.token = /*Tokens[*/"main"/*]*/;
+      result.token = "main";
       return result;
     }
 
-    result.token = /*Tokens[*/"identifier"/*]*/;
+    result.token = "identifier";
     result.value = value;
     return result;
   }
@@ -551,13 +548,12 @@ function getToken(code, index) {
 
     result.next = index + offset;
 
-    result.token = /*Tokens[*/"number"/*]*/;
+    result.token = "number";
     result.value = value;
     return result;
   }
 
-  console.log(code[index]);
-  throw "wtf";
+  throw "unexpected syntax";
 }
 
 function isSpace(char) {
@@ -584,7 +580,9 @@ function printSubTree(tree, indent, root) {
   let result = indent;
 
   if (!root) {
-    if (tree.index < tree.parent.childs.length - 1) {
+    let index = tree.parent.childs.indexOf(tree);
+    // if (tree.index < tree.parent.childs.length - 1) {
+    if (index < tree.parent.childs.length - 1) {
       result += MiddleChar + " ";
       indent += ConnectChar + " ";
     } else {
@@ -601,7 +599,7 @@ function printSubTree(tree, indent, root) {
 }
 
 function printTree(tree) {
-  console.log(printSubTree(tree, "", true));
+  return printSubTree(tree, "", true);
 }
 
 class AstNode {
@@ -678,7 +676,7 @@ function Expr(tokens, index) {
       // let val = new AstNode("body", body.node.value, null, null);
 
       return {
-        node:  new AstNode("fun", "", iden, body.node),
+        node: new AstNode("fun", "", iden, body.node),
         next: body.next
       };
     }
@@ -689,7 +687,7 @@ function Expr(tokens, index) {
       let val = new AstNode("val", valToken.value, null, null);
 
       return {
-        node:  new AstNode("assign", "int", iden, val),
+        node: new AstNode("assign", "int", iden, val),
         next: index + 4
       };
     }
