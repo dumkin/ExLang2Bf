@@ -1,4 +1,4 @@
-var buttonConvert = document.querySelector("#convert").onclick = function () {
+document.querySelector("#convert").onclick = function () {
   var src = document.querySelector("#src").value;
   var bf = convert(src);
   document.querySelector("#bf").value = bf;
@@ -224,7 +224,7 @@ function convert(src) {
   var AreEqual = (left, right) => {
     var leftCopyName = createVarCopyPointersSafe(left);
     var leftCopy = variables[leftCopyName];
-    
+
     var rightCopyName = createVarCopyPointersSafe(right);
     var rightCopy = variables[rightCopyName];
 
@@ -247,7 +247,7 @@ function convert(src) {
     result += "]";
 
     deleteVar(rightCopyName);
-    
+
     return leftCopyName;
   }
 
@@ -396,4 +396,168 @@ function convert(src) {
     }
   }
   return result;
+}
+
+document.querySelector("#convert_new").onclick = function () {
+  var src = document.querySelector("#src_new").value;
+  var bf = convert_new(src);
+  document.querySelector("#bf_new").value = bf;
+}
+
+function convert_new(src) {
+  tokens = [];
+  index = 0;
+
+  while (src.length > index) {
+    token = getToken(src, index);
+    index = token.next;
+    tokens.push(token);
+  }
+
+  console.log(src);
+  console.log(tokens);
+  return src;
+}
+
+var iota_data = 0;
+var iota = (offset = -1) => {
+  if (offset !== -1) {
+    iota_data = offset;
+  }
+  return iota_data++;
+}
+
+const Tokens = {
+  "fun": iota(0),
+  "main": iota(),
+  "brace_open": iota(),
+  "brace_close": iota(),
+  "paren_open": iota(),
+  "paren_close": iota(),
+  "semicolon": iota(),
+  "assign": iota(),
+  "identifier": iota(),
+  "number": iota(),
+  "int": iota(),
+  "end": iota()
+};
+
+function getToken(code, index) {
+  result = {
+    index: index,
+    next: index + 1,
+    token: "undefined",
+    value: ""
+  };
+
+  while (code.length > index && isSpace(code[index])) {
+    index++;
+    continue;
+  }
+
+  if (code.length == index) {
+    result.next = code.length;
+    result.token = /*Tokens[*/"end"/*]*/;
+    return result;
+  }
+
+  if (code[index] == '{') {
+    result.next = index + 1;
+    result.token = /*Tokens[*/"brace_open"/*]*/;
+    return result;
+  }
+
+  if (code[index] == '}') {
+    result.next = index + 1;
+    result.token = /*Tokens[*/"brace_close"/*]*/;
+    return result;
+  }
+
+  if (code[index] == '(') {
+    result.next = index + 1;
+    result.token = /*Tokens[*/"paren_open"/*]*/;
+    return result;
+  }
+
+  if (code[index] == ')') {
+    result.next = index + 1;
+    result.token = /*Tokens[*/"paren_close"/*]*/;
+    return result;
+  }
+
+  if (code[index] == ';') {
+    result.next = index + 1;
+    result.token = /*Tokens[*/"semicolon"/*]*/;
+    return result;
+  }
+
+  if (code[index] == '=') {
+    result.next = index + 1;
+    result.token = /*Tokens[*/"assign"/*]*/;
+    return result;
+  }
+
+  if (isIdentifier(code[index])) {
+    let offset = 0;
+    let value = code[index];
+
+    do {
+      offset++;
+      value += code[index + offset];
+    } while (code.length > index + offset && isIdentifier(code[index + offset]));
+    value = value.slice(0, -1);
+
+    result.next = index + offset;
+
+    if (value == "fun") {
+      result.token = /*Tokens[*/"fun"/*]*/;
+      return result;
+    }
+
+    if (value == "int") {
+      result.token = /*Tokens[*/"int"/*]*/;
+      return result;
+    }
+
+    if (value == "main") {
+      result.token = /*Tokens[*/"main"/*]*/;
+      return result;
+    }
+
+    result.token = /*Tokens[*/"identifier"/*]*/;
+    result.value = value;
+    return result;
+  }
+
+  if (isNumber(code[index])) {
+    let offset = 0;
+    let value = code[index];
+
+    do {
+      offset++;
+      value += code[index + offset];
+    } while (code.length > index + offset && isNumber(code[index + offset]));
+    value = value.slice(0, -1);
+
+    result.next = index + offset;
+
+    result.token = /*Tokens[*/"number"/*]*/;
+    result.value = value;
+    return result;
+  }
+
+  console.log(code[index]);
+  throw "wtf";
+}
+
+function isSpace(char) {
+  return /(\t| |\n)/.test(char);
+}
+
+function isIdentifier(str) {
+  return /[a-zA-Z]/.test(str);
+}
+
+function isNumber(str) {
+  return /[0-9]/.test(str);
 }
