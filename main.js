@@ -405,6 +405,8 @@ document.querySelector("#convert_new").onclick = function () {
 }
 
 function convert_new(src) {
+  console.log(src);
+
   tokens = [];
   index = 0;
 
@@ -414,8 +416,16 @@ function convert_new(src) {
     tokens.push(token);
   }
 
-  console.log(src);
   console.log(tokens);
+
+  let tree = generateTree(tokens);
+
+  printTree(tree);
+
+  // var root = new AstNode("type", "test", null, null);
+  // root.AddChild(new AstNode("child", "lol", null, null));
+  // printTree(root);
+
   return src;
 }
 
@@ -560,4 +570,134 @@ function isIdentifier(str) {
 
 function isNumber(str) {
   return /[0-9]/.test(str);
+}
+
+function printSubTree(tree, indent, root) {
+  const ConnectChar = "|";
+  const MiddleChar = "*";
+  const LastChar = "-";
+
+  if (tree == null) {
+    return "";
+  }
+
+  let result = indent;
+
+  if (!root) {
+    if (tree.index < tree.parent.childs.length - 1) {
+      result += MiddleChar + " ";
+      indent += ConnectChar + " ";
+    } else {
+      result += LastChar + " ";
+      indent += " ";
+    }
+  }
+
+  result += tree.type + `(${tree.text})` + "\n";
+  for (let i = 0; i < tree.childs.length; i++) {
+    result += printSubTree(tree.GetChild(i), indent, false);
+  }
+  return result;
+}
+
+function printTree(tree) {
+  console.log(printSubTree(tree, "", true));
+}
+
+class AstNode {
+  type;
+  text;
+  parent = null;
+  childs = [];
+
+  constructor(type, text, child1, child2) {
+    this.type = type;
+    this.text = text;
+
+    if (child1 != null) {
+      this.AddChild(child1);
+    }
+    if (child2 != null) {
+      this.AddChild(child2);
+    }
+  }
+
+  AddChild(child) {
+    if (child == null) {
+      return;
+    }
+    if (child.parent != null) {
+      // child.parent.childs.Remove(child);
+      delete child.parent.childs[child];
+    }
+    delete this.childs[child];
+    this.childs.push(child);
+    child.parent = this;
+  }
+
+  RemoveChild(child) {
+    delete this.childs[child];
+    if (child.parent == this) {
+      child.parent = null;
+    }
+  }
+
+  GetChild(index) {
+    return this.childs[index];
+  }
+}
+
+function generateTree(tokens) {
+  let root = new AstNode("root", "", null, null);
+  for (let i = 0; i < tokens.length; i++) {
+    let tree = Expr(tokens, i);
+    i = tree.next;
+    root.AddChild(tree.node);
+  }
+  return root;
+}
+
+function Expr(tokens, index) {
+  switch (tokens[index].token) {
+    case "fun": {
+      let idenToken = tokens[index + 1];
+      idenToken.value = "main";
+      if (tokens[index + 2].token != "paren_open") {
+        throw "error paren_open";
+      }
+      // TODO: params
+      let offset = 1;
+      while (tokens[index + offset].token != "paren_close") {
+        offset++;
+      }
+      if (tokens[index + offset + 1].token != "brace_open") {
+        throw "error brace_open";
+      }
+      let body = Expr(tokens, index + offset + 2);
+      let iden = new AstNode("iden", idenToken.value, null, null);
+      // let val = new AstNode("body", body.node.value, null, null);
+
+      return {
+        node:  new AstNode("fun", "", iden, body.node),
+        next: body.next
+      };
+    }
+    case "int": {
+      let idenToken = tokens[index + 1];
+      let valToken = tokens[index + 3];
+      let iden = new AstNode("iden", idenToken.value, null, null);
+      let val = new AstNode("val", valToken.value, null, null);
+
+      return {
+        node:  new AstNode("assign", "int", iden, val),
+        next: index + 4
+      };
+    }
+    default:
+      return {
+        // node:  new AstNode("empty", "", null, null),
+        node: null,
+        next: index + 1
+      };
+  }
 }
