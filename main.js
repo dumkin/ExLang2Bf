@@ -422,6 +422,11 @@ function convert_new(src) {
 
   console.log(printTree(tree));
 
+  let parser = new SyntaxParser(tokens)
+  let node = parser.parse();
+  console.log(node);
+  console.log(printTree(node))
+
   // return src;
   return printTree(tree);
 }
@@ -436,7 +441,6 @@ var iota = (offset = -1) => {
 
 const Tokens = {
   "fun": iota(0),
-  "main": iota(),
   "brace_open": iota(),
   "brace_close": iota(),
   "paren_open": iota(),
@@ -526,11 +530,6 @@ function getToken(code, index) {
       return result;
     }
 
-    if (value == "main") {
-      result.token = "main";
-      return result;
-    }
-
     result.token = "identifier";
     result.value = value;
     return result;
@@ -568,21 +567,19 @@ function isNumber(str) {
   return /[0-9]/.test(str);
 }
 
-function printSubTree(tree, indent, root) {
+function printSubTree(node, indent, root) {
   const ConnectChar = "|";
   const MiddleChar = "*";
   const LastChar = "-";
 
-  if (tree == null) {
+  if (node == null) {
     return "";
   }
 
   let result = indent;
 
   if (!root) {
-    let index = tree.parent.childs.indexOf(tree);
-    // if (tree.index < tree.parent.childs.length - 1) {
-    if (index < tree.parent.childs.length - 1) {
+    if (node.IndexFromParent() < node.parent.childs.length - 1) {
       result += MiddleChar + " ";
       indent += ConnectChar + " ";
     } else {
@@ -591,9 +588,9 @@ function printSubTree(tree, indent, root) {
     }
   }
 
-  result += tree.type + `(${tree.text})` + "\n";
-  for (let i = 0; i < tree.childs.length; i++) {
-    result += printSubTree(tree.GetChild(i), indent, false);
+  result += node.type + ` (${node.text})` + "\n";
+  for (let i = 0; i < node.childs.length; i++) {
+    result += printSubTree(node.GetChild(i), indent, false);
   }
   return result;
 }
@@ -625,7 +622,6 @@ class AstNode {
       return;
     }
     if (child.parent != null) {
-      // child.parent.childs.Remove(child);
       delete child.parent.childs[child];
     }
     delete this.childs[child];
@@ -643,6 +639,13 @@ class AstNode {
   GetChild(index) {
     return this.childs[index];
   }
+
+  IndexFromParent() {
+    if (this.parent == null) {
+      return -1;
+    }
+    return this.parent.childs.indexOf(this);
+  }
 }
 
 function generateTree(tokens) {
@@ -659,7 +662,6 @@ function Expr(tokens, index) {
   switch (tokens[index].token) {
     case "fun": {
       let idenToken = tokens[index + 1];
-      idenToken.value = "main";
       if (tokens[index + 2].token != "paren_open") {
         throw "error paren_open";
       }
@@ -697,5 +699,111 @@ function Expr(tokens, index) {
         node: null,
         next: index + 1
       };
+  }
+}
+
+class SyntaxParser {
+  tokens;
+  index = 0;
+  root;
+
+  constructor(tokens) {
+    this.tokens = tokens;
+    this.root = new AstNode("root", "", null, null);
+  }
+
+  getNumber() {
+    const e = this.tokens[this.index];
+    if (e.token !== "number") {
+      throw "unexpected token";
+    }
+
+    this.index++;
+    return new AstNode("number", e.value, null, null)
+  }
+
+  getId() {
+    const e = this.tokens[this.index];
+    if (e.token !== "identifier") {
+      throw "unexpected token";
+    }
+
+    this.index++;
+    return new AstNode("identifier", e.value, null, null)
+  }
+
+  term() {
+    return Add();
+  }
+
+  match(id) {
+    let offset = 0;
+    while (this.tokens[this.index + offset].token !== id) {
+      offset++;
+    }
+
+    this.index += offset + 1;
+    return offset;
+  }
+
+  getGroup() {
+    const e = this.tokens[this.index];
+    if (e.token === "brace_open") {
+      let offset = 1;
+      while (this.tokens[this.index + offset].token !== "brace_close") {
+        offset++;
+      }
+
+      let n = this.term();
+      this.index += offset;
+
+      return n;
+    } else if (e.token === "identifier") {
+      return this.getId();
+    } else if (e.token === "number") {
+      return this.getNumber();
+    }
+
+    throw "unexpected token";
+  }
+
+  mult() {
+    console.log("mult");
+    // let r = this.getGroup();
+    return null;
+  }
+
+  Add() {
+    console.log("Add");
+    // let r = this.mult();
+    return null;
+  }
+
+  stack_brace() {
+    match("brace_open")
+
+  }
+
+  expr() {
+    const e = this.tokens[this.index];
+    switch (e.token) {
+      case "int":
+        this.match("int")
+        let k = this.getId();
+        this.match("assign")
+        let v = this.getGroup();
+        this.match("semicolon")
+        return new AstNode("int", "", k, v)
+      default:
+        this.index++;
+        return new AstNode("null", "", null, null)
+    }
+  }
+
+  parse() {
+    while (this.tokens[this.index].token !== "end") {
+      this.root.AddChild(this.expr());
+    }
+    return this.root;
   }
 }
