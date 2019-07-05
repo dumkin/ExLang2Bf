@@ -796,13 +796,13 @@ class TreeOut {
     const ConnectChar = "| ";
     const MiddleChar = "├─";
     const LastChar = "└─";
-  
+
     if (node == null) {
       return "";
     }
-  
+
     let result = indent;
-  
+
     if (!root) {
       if (node.IndexFromParent() < node.parent.childs.length - 1) {
         result += MiddleChar + " ";
@@ -812,7 +812,7 @@ class TreeOut {
         indent += "  ";
       }
     }
-  
+
     result += node.type + ` (${node.text})` + "\n";
     for (let i = 0; i < node.childs.length; i++) {
       result += this.PrintSub(node.GetChild(i), indent, false);
