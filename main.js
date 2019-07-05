@@ -421,10 +421,14 @@ function convert_new(src) {
   let parser = new SyntaxParser(tokens)
   let node = parser.parse();
   console.log(node);
-  console.log(printTree(node))
+
+  let printer = new TreeOut();
+  let nodeText = printer.Print(node);
+
+  console.log(nodeText)
 
   // return src;
-  return printTree(node);
+  return nodeText;
 }
 
 var iota_data = 0;
@@ -567,38 +571,6 @@ function isIdentifier(str) {
 
 function isNumber(str) {
   return /[0-9]/.test(str);
-}
-
-function printSubTree(node, indent, root) {
-  const ConnectChar = "|";
-  const MiddleChar = "*";
-  const LastChar = "-";
-
-  if (node == null) {
-    return "";
-  }
-
-  let result = indent;
-
-  if (!root) {
-    if (node.IndexFromParent() < node.parent.childs.length - 1) {
-      result += MiddleChar + " ";
-      indent += ConnectChar + " ";
-    } else {
-      result += LastChar + " ";
-      indent += " ";
-    }
-  }
-
-  result += node.type + ` (${node.text})` + "\n";
-  for (let i = 0; i < node.childs.length; i++) {
-    result += printSubTree(node.GetChild(i), indent, false);
-  }
-  return result;
-}
-
-function printTree(tree) {
-  return printSubTree(tree, "", true);
 }
 
 class AstNode {
@@ -816,5 +788,39 @@ class SyntaxParser {
       this.root.AddChild(this.Expr());
     }
     return this.root;
+  }
+}
+
+class TreeOut {
+  PrintSub(node, indent, root) {
+    const ConnectChar = "| ";
+    const MiddleChar = "├─";
+    const LastChar = "└─";
+  
+    if (node == null) {
+      return "";
+    }
+  
+    let result = indent;
+  
+    if (!root) {
+      if (node.IndexFromParent() < node.parent.childs.length - 1) {
+        result += MiddleChar + " ";
+        indent += ConnectChar + " ";
+      } else {
+        result += LastChar + " ";
+        indent += "  ";
+      }
+    }
+  
+    result += node.type + ` (${node.text})` + "\n";
+    for (let i = 0; i < node.childs.length; i++) {
+      result += this.PrintSub(node.GetChild(i), indent, false);
+    }
+    return result;
+  }
+
+  Print(node) {
+    return this.PrintSub(node, "", true);
   }
 }
