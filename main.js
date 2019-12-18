@@ -390,6 +390,10 @@ function convert(src) {
         result += "]";
         break;
       }
+      case "dump": {
+        result += "#";
+        break;
+      }
       default: {
         return `Error: undefined ${operators[0]} operator in ${i + 1} line.`;
       }
