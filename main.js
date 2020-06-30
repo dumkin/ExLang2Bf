@@ -471,18 +471,26 @@ var iota = (offset = -1) => {
 }
 
 const Tokens = {
-  "fun": iota(0),
-  "brace_open": iota(),
-  "brace_close": iota(),
-  "paren_open": iota(),
-  "paren_close": iota(),
+  "identifier": iota(0),
+  "number": iota(0),
+
+  "brace_left": iota(),
+  "brace_right": iota(),
+
+  "paren_left": iota(),
+  "paren_right": iota(),
+
   "semicolon": iota(),
-  "assign": iota(),
-  "identifier": iota(),
-  "number": iota(),
-  "int": iota(),
-  "out": iota(),
-  "end": iota()
+  "equal": iota(),
+  "plus": iota(),
+  "minus": iota(),
+  "less": iota(),
+
+  "if": iota(),
+  "else": iota(),
+  "while": iota(),
+
+  "eof": iota()
 };
 
 function getToken(code, index) {
@@ -500,31 +508,31 @@ function getToken(code, index) {
 
   if (code.length == index) {
     result.next = code.length;
-    result.token = "end";
+    result.token = "eof";
     return result;
   }
 
   if (code[index] == '{') {
     result.next = index + 1;
-    result.token = "brace_open";
+    result.token = "brace_left";
     return result;
   }
 
   if (code[index] == '}') {
     result.next = index + 1;
-    result.token = "brace_close";
+    result.token = "brace_right";
     return result;
   }
 
   if (code[index] == '(') {
     result.next = index + 1;
-    result.token = "paren_open";
+    result.token = "paren_left";
     return result;
   }
 
   if (code[index] == ')') {
     result.next = index + 1;
-    result.token = "paren_close";
+    result.token = "paren_right";
     return result;
   }
 
@@ -536,39 +544,25 @@ function getToken(code, index) {
 
   if (code[index] == '=') {
     result.next = index + 1;
-    result.token = "assign";
+    result.token = "equal";
     return result;
   }
 
-  if (isIdentifier(code[index])) {
-    let offset = 0;
-    let value = code[index];
+  if (code[index] == '+') {
+    result.next = index + 1;
+    result.token = "plus";
+    return result;
+  }
 
-    do {
-      offset++;
-      value += code[index + offset];
-    } while (code.length > index + offset && isIdentifier(code[index + offset]));
-    value = value.slice(0, -1);
+  if (code[index] == '-') {
+    result.next = index + 1;
+    result.token = "minus";
+    return result;
+  }
 
-    result.next = index + offset;
-
-    if (value == "fun") {
-      result.token = "fun";
-      return result;
-    }
-
-    if (value == "int") {
-      result.token = "int";
-      return result;
-    }
-
-    if (value == "out") {
-      result.token = "out";
-      return result;
-    }
-
-    result.token = "identifier";
-    result.value = value;
+  if (code[index] == '<') {
+    result.next = index + 1;
+    result.token = "less";
     return result;
   }
 
@@ -585,6 +579,43 @@ function getToken(code, index) {
     result.next = index + offset;
 
     result.token = "number";
+    result.value = value;
+    return result;
+  }
+
+  if (isIdentifier(code[index])) {
+    let offset = 0;
+    let value = code[index];
+
+    do {
+      offset++;
+      value += code[index + offset];
+    } while (code.length > index + offset && isIdentifier(code[index + offset]));
+    value = value.slice(0, -1);
+
+    result.next = index + offset;
+
+    if (value == "if") {
+      result.token = "if";
+      return result;
+    }
+
+    if (value == "else") {
+      result.token = "else";
+      return result;
+    }
+
+    if (value == "while") {
+      result.token = "while";
+      return result;
+    }
+
+    // if (value == "out") {
+    //   result.token = "out";
+    //   return result;
+    // }
+
+    result.token = "identifier";
     result.value = value;
     return result;
   }
@@ -660,164 +691,163 @@ class SyntaxParser {
 
   constructor(tokens) {
     this.tokens = tokens;
-    this.root = new AstNode("root", "", null, null);
+    this.root = new AstNode("root", null, null, null);
   }
 
-  Expr() {
-    const c = this.tokens[this.index];
-
-    if (c.token == "fun") {
-      return this.Fun();
-    } else if (c.token == "int") {
-      return this.Int();
-    } else if (c.token == "out") {
-      return this.Out();
+  Term() {
+    let node = null;
+    
+    if (this.currentToken() == "identifier") {
+      node = new AstNode("identifier", this.tokens[this.index].value, null, null);
+      this.index++;
+    } else if (this.currentToken() == "number") {
+      node = new AstNode("number", this.tokens[this.index].value, null, null);
+      this.index++;
+    } else {
+      node = this.ExpressionParen();
     }
 
-    this.index++;
-    return null;
+    return node;
   }
 
-  Fun() {
-    const fun = this.tokens[this.index];
-    this.index++;
+  Summa() {
+    let node = this.Term();
+    let kindType = null;
 
-    const ident = this.Ident();
-
-    const params = this.Params();
-
-    const body = this.Body();
-
-    return new AstNode("fun", "", ident, body);
-  }
-
-  Params() {
-    const paramsOffset = this.WaitWithStack("paren_close", "paren_open", "paren_close");
-    // this.index += paramsOffset;
-    let endIndex = this.index + paramsOffset;
-
-    let body = new AstNode("body", "", null, null);
-    while (this.index < endIndex && this.NotEndTokens()) {
-      body.AddChild(this.Expr());
-    }
-
-    if (this.index != endIndex) {
-      console.log("wtf");
-    }
-
-    // this.index++;
-
-    return body;
-  }
-
-  Ident() {
-    const e = this.tokens[this.index];
-    if (e.token !== "identifier") {
-      throw "unexpected token";
-    }
-
-    this.index++;
-    return new AstNode("identifier", e.value, null, null)
-  }
-
-  Body() {
-    const paramsOffset = this.WaitWithStack("brace_close", "brace_open", "brace_close");
-    let endIndex = this.index + paramsOffset;
-
-    let body = new AstNode("body", "", null, null);
-    while (this.index < endIndex && this.NotEndTokens()) {
-      body.AddChild(this.Expr());
-    }
-
-    if (this.index != endIndex) {
-      console.log("wtf");
-    }
-
-    return body;
-  }
-
-  WaitWithStack(token, stackOpen, stackClose) {
-    let stack = 0;
-    let offset = 0;
-
-    let offsetToken = () => {
-      return this.tokens[this.index + offset].token;
-    };
-
-    while (offsetToken() !== token || stack !== 1) {
-      if (this.index + offset >= this.tokens.length || stack < 0) {
-        throw "wtf";
+    while (this.currentToken() === "plus" || this.currentToken() === "minus") {
+      if (this.currentToken() === "plus") {
+        kindType = "plus";
+      } else {
+        kindType = "minus";
       }
 
-      if (offsetToken() === stackOpen) {
-        stack++;
+      this.index++;
+
+      node = new AstNode(kindType, null, node, this.Term());
+    }
+
+    return node;
+  }
+
+  Test() {
+    let node = this.Summa();
+
+    if (this.currentToken() === "less") {
+      this.index++;
+
+      let lessNode = new AstNode("less", null, node, this.Summa());
+
+      return lessNode;
+    }
+    
+    return node;
+  }
+
+  Expression() {
+    if (this.currentToken() !== "identifier") {
+      return this.Test();
+    }
+
+    let node = this.Test();
+
+    if (this.currentToken() === "equal" && node.type === "identifier") {
+      this.index++;
+      let setNode = new AstNode("set", null, node, this.Expression());
+
+      return setNode;
+    }
+
+    return node;
+  }
+
+  ExpressionParen() {
+    if (this.currentToken() !== "paren_left") {
+      throw '"(" expected';
+    }
+    this.index++;
+
+    let node = this.Expression();
+
+    if (this.currentToken() !== "paren_right") {
+      throw '")" expected';
+    }
+    this.index++;
+
+    return node;
+  }
+
+  Statement() {
+    let node = null;
+    
+    if (this.currentToken() == "if") {
+      let ifNode = new AstNode("if", null, null, null);
+      this.index++;
+
+      ifNode.AddChild(this.ExpressionParen());
+      ifNode.AddChild(this.Statement());
+
+      if (this.currentToken() == "else") {
+        let elseNode = new AstNode("else", null, null, null);
+        this.index++;
+
+        elseNode.AddChild(this.Statement());
+
+        ifNode.AddChild(elseNode);
       }
-      if (offsetToken() === stackClose) {
-        stack--;
+
+      node = ifNode;
+    } else if (this.currentToken() == "while") {
+
+    } else if (this.currentToken() == "do") {
+
+    } else if (this.currentToken() == "semicolon") {
+      node = new AstNode("empty(semicolon)", null, null, null);
+      this.index++;
+    } else if (this.currentToken() == "brace_left") {
+      node = new AstNode("EMPTY", "", null, null);
+      this.index++;
+
+      // const paramsOffset = this.WaitWithStack("brace_right", "brace_left", "brace_right");
+      // let endIndex = this.index + paramsOffset;
+  
+      // while (this.index < endIndex && this.NotEndTokens()) {
+      //   node = new AstNode("SEQ", null, node, this.Statement());
+      // }
+      while (this.currentToken() != "brace_right") {
+        node = new AstNode("SEQ", null, node, this.Statement());
+      }
+      this.index++;
+  
+      // if (this.index != endIndex) {
+      //   console.log("wtf");
+      // }
+    } else {
+      node = new AstNode("expression", null, null, null);
+      node.AddChild(this.Expression());
+
+      if (this.currentToken() != "semicolon") {
+        console.log('";" expected');
       }
 
-      offset++;
+      this.index++;
     }
 
-    return offset;
+    return node;
   }
 
-  NotEndTokens(offset = 0) {
-    return this.index + offset < this.tokens.length;
-  }
-
-  Int() {
-    const int = this.tokens[this.index];
-    if (int.token !== "int") {
-      throw "unexpected token;"
-    }
-    this.index++;
-
-    const ident = this.Ident();
-
-    const assign = this.tokens[this.index];
-    if (assign.token !== "assign") {
-      throw "unexpected token;"
-    }
-    this.index++;
-
-    const value = this.Number();
-
-    const semi = this.tokens[this.index];
-    if (semi.token !== "semicolon") {
-      throw "unexpected token;"
-    }
-    this.index++;
-
-    return new AstNode("int", "", ident, value);
-  }
-
-  Out() {
-    const out = this.tokens[this.index];
-    this.index++;
-
-    const params = this.Params();
-
-    const semicolon = this.tokens[this.index];
-    this.index++;
-
-    return new AstNode("out", "", params, null);
-  }
-
-  Number() {
-    const e = this.tokens[this.index];
-    if (e.token !== "number") {
-      throw "unexpected token";
-    }
-
-    this.index++;
-    return new AstNode("number", e.value, null, null)
+  currentToken() {
+    return this.tokens[this.index].token;
   }
 
   parse() {
-    while (this.NotEndTokens() && this.tokens[this.index].token !== "end") {
-      this.root.AddChild(this.Expr());
-    }
+    // while (this.NotEndTokens() && this.tokens[this.index].token !== "eof") {
+    this.root.AddChild(this.Statement());
+    // }
+
+    // if (this.tokens[this.index].token !== "eof") {
+    //   throw "Invalid statement syntax";
+    // }
+
     return this.root;
   }
 }
