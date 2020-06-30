@@ -307,7 +307,7 @@ function convert(src) {
         if (operators.length == 2) {
           const variable = operators[1];
 
-          if (variables[variable].type == "number") {
+          if (variables[variable].type == "int8") {
             getMemoryFromIndex(variables[variable].memoryIndex);
             result += ".";
           } else if (variables[variable].type == "string") {
@@ -316,6 +316,33 @@ function convert(src) {
               getMemoryFromIndex(e);
               result += ".";
             }
+          }
+        } else if (operators.length == 3 && operators[2] == "tostring") {
+          console.log("test");
+          const variable = operators[1];
+
+          if (variables[variable].type == "int8") {
+            getMemoryFromIndex(variables[variable].memoryIndex);
+
+            const varIndex = `translator_for_index_line_${i + 1}`;
+            createVar(varIndex, Number(48));
+            var indexator = variables[varIndex];
+
+            var copyName = createVarCopyPointersSafe(variable);
+            var copy = variables[copyName];
+        
+            getMemoryFromIndex(indexator.memoryIndex);
+            result += "[";
+            result += "-";
+            getMemoryFromIndex(copy.memoryIndex);
+            result += "+";
+            getMemoryFromIndex(indexator.memoryIndex);
+            result += "]";
+            getMemoryFromIndex(copy.memoryIndex);
+            result += ".";
+
+            deleteVar(varIndex);
+            deleteVar(copyName);
           }
         }
         break;
