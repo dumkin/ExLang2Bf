@@ -1,3 +1,5 @@
+'use strict';
+
 document.querySelector("#convert").onclick = function () {
   var src = document.querySelector("#src").value;
   var bf = convert(src);
@@ -377,7 +379,7 @@ function convert(src) {
         break;
       }
       case "endif": {
-        index = stackPointers[stackPointers.length - 1];
+        let index = stackPointers[stackPointers.length - 1];
 
         getMemoryFromIndex(index.ind);
         deleteVar(index.name);
@@ -408,7 +410,7 @@ function convert(src) {
         break;
       }
       case "endfor": {
-        index = stackPointers[stackPointers.length - 1];
+        let index = stackPointers[stackPointers.length - 1];
 
         getMemoryFromIndex(index.ind);
         deleteVar(index.name);
@@ -438,11 +440,11 @@ document.querySelector("#convert_new").onclick = function () {
 function convert_new(src) {
   console.log(src);
 
-  tokens = [];
-  index = 0;
+  let tokens = [];
+  let index = 0;
 
   while (src.length > index) {
-    token = getToken(src, index);
+    let token = getToken(src, index);
     index = token.next;
     tokens.push(token);
   }
@@ -458,8 +460,12 @@ function convert_new(src) {
 
   console.log(nodeText)
 
+  let compiler = new Compiler();
+
+  let bin = compiler.compile(node);
+
   // return src;
-  return nodeText;
+  return bin;
 }
 
 var iota_data = 0;
@@ -494,7 +500,7 @@ const Tokens = {
 };
 
 function getToken(code, index) {
-  result = {
+  let result = {
     index: index,
     next: index + 1,
     token: "undefined",
@@ -804,7 +810,7 @@ class SyntaxParser {
       node = new AstNode("empty(semicolon)", null, null, null);
       this.index++;
     } else if (this.currentToken() == "brace_left") {
-      node = new AstNode("EMPTY", "", null, null);
+      node = new AstNode("EMPTY", null, null, null);
       this.index++;
 
       // const paramsOffset = this.WaitWithStack("brace_right", "brace_left", "brace_right");
@@ -874,7 +880,12 @@ class TreeOut {
       }
     }
 
-    result += node.type + ` (${node.text})` + "\n";
+    result += node.type;
+    if (node.text != null) {
+      result += ` (${node.text})`;
+    }
+    result += "\n";
+    
     for (let i = 0; i < node.childs.length; i++) {
       result += this.PrintSub(node.GetChild(i), indent, false);
     }
@@ -883,5 +894,438 @@ class TreeOut {
 
   Print(node) {
     return this.PrintSub(node, "", true);
+  }
+}
+
+class Compiler {
+  pc = 0;
+  result = "";
+
+
+  tempIndex = 0;
+  variables = {};
+  memory = {};
+  currentMemoryPointer = 0;
+  stackPointers = [];
+
+  getTempIndex() {
+    return this.tempIndex++;
+  }
+  getMemoryFreeIndex() {
+    const length = Object.keys(this.memory).length;
+    for (let i = 0; i < length; i++) {
+      if (!(i in this.memory)) {
+        return i;
+      }
+    }
+    return length;
+  }
+  getMemoryFromIndex(to) {
+    for (let i = 0; i < Math.abs(this.currentMemoryPointer - to); i++) {
+      if (this.currentMemoryPointer - to < 0) {
+        this.result += ">";
+      } else {
+        this.result += "<";
+      }
+    }
+    this.currentMemoryPointer = to;
+  }
+  createVar(key, value) {
+    switch (typeof value) {
+      case "number":
+        this.createVar_Int8(key, value);
+        break;
+      case "string":
+        this.createVar_String(key, value);
+        break;
+      default:
+        throw `unsupported type (${value})`;
+    }
+  }
+  deleteVar(name) {
+    // const beforeIndex = this.currentMemoryPointer;
+
+    // this.result += "before";
+    // getMemoryFromIndex(this.variables[name].memoryIndex)
+    // this.result += "[-]";
+
+    delete this.variables[name];
+    delete this.memory[name];
+
+    //getMemoryFromIndex(beforeIndex)
+    //this.result += "after";
+  }
+  createVarCopy(name) {
+    const copyName = `translator_temp_${this.getTempIndex()}_${name}_copy`;
+    const newOrigName = `translator_temp_${this.getTempIndex()}_${name}_copy`;
+
+    this.createVar(copyName, 0);
+    this.createVar(newOrigName, 0);
+
+    var orig = this.variables[name];
+    var copy = this.variables[copyName];
+    var newOrig = this.variables[newOrigName];
+
+    this.getMemoryFromIndex(orig.memoryIndex);
+    this.result += "[";
+    this.getMemoryFromIndex(copy.memoryIndex);
+    this.result += "+";
+    this.getMemoryFromIndex(newOrig.memoryIndex);
+    this.result += "+";
+    this.getMemoryFromIndex(orig.memoryIndex);
+    this.result += "-";
+    this.result += "]";
+
+    this.memory[newOrig.memoryIndex] = true;
+    this.memory[copy.memoryIndex] = true;
+
+    orig.memoryIndex = newOrig.memoryIndex;
+
+    this.deleteVar(newOrigName);
+
+    return copyName;
+  }
+  createVarCopyPointersSafe(name) {
+    const copyName = `translator_temp_${this.getTempIndex()}_${name}_copy`;
+    const copyTempName = `translator_temp_${this.getTempIndex()}_${name}_copy`;
+
+    this.createVar(copyName, 0);
+    this.createVar(copyTempName, 0);
+
+    var orig = this.variables[name];
+    var copy = this.variables[copyName];
+    var copyTemp = this.variables[copyTempName];
+
+    this.getMemoryFromIndex(orig.memoryIndex);
+    this.result += "[";
+    this.getMemoryFromIndex(copy.memoryIndex);
+    this.result += "+";
+    this.getMemoryFromIndex(copyTemp.memoryIndex);
+    this.result += "+";
+    this.getMemoryFromIndex(orig.memoryIndex);
+    this.result += "-";
+    this.result += "]";
+
+    this.getMemoryFromIndex(copyTemp.memoryIndex);
+    this.result += "[";
+    this.getMemoryFromIndex(orig.memoryIndex);
+    this.result += "+";
+    this.getMemoryFromIndex(copyTemp.memoryIndex);
+    this.result += "-";
+    this.result += "]";
+
+    this.memory[copy.memoryIndex] = true;
+
+    this.deleteVar(copyTempName);
+
+    return copyName;
+  }
+  createVar_Int8(name, value) {
+    if (!Number.isInteger(value)) {
+      throw `variable int8 is not a integer - name: ${name}, value: ${value}`;
+    }
+
+    const valueNormalized = value % 256;
+    const memoryIndex = this.getMemoryFreeIndex();
+
+    this.variables[name] = {
+      memoryIndex: memoryIndex,
+      type: "int8"
+    };
+    this.memory[memoryIndex] = true;
+
+    this.getMemoryFromIndex(memoryIndex);
+    this.writeMemoryOptimized(valueNormalized);
+  }
+  createVar_String(key, value) {
+    if (typeof value !== "string") {
+      throw `variable ${name} is not string (${value})`;
+    }
+
+    var memoryIndexes = [];
+    var chars = [];
+    for (let i = 0; i < value.length; i++) {
+      const memoryIndex = this.getMemoryFreeIndex();
+      memoryIndexes.push(memoryIndex);
+      chars.push(value.charCodeAt(i));
+      this.memory[memoryIndex] = true;
+    }
+
+    this.variables[key] = {
+      memoryIndex: memoryIndexes,
+      type: "string"
+    };
+
+    this.writeMemoryArrayOptimized(chars, memoryIndexes);
+  }
+  writeMemoryLinear(value) {
+    for (let i = 0; i < value; i++) {
+      this.result += "+"
+    }
+  }
+  writeMemoryOptimized(value) {
+    if (value < 11) {
+      this.writeMemoryLinear(value);
+      return;
+    }
+
+    var quotient = Math.floor(value / 10);
+    var remainder = value % 10;
+
+    const slotBefore = this.currentMemoryPointer;
+    const slot = this.getMemoryFreeIndex();
+    this.getMemoryFromIndex(slot);
+    for (let i = 0; i < quotient; i++) {
+      this.result += "+"
+    }
+    this.result += "["
+    this.result += "-"
+    this.getMemoryFromIndex(slotBefore);
+    for (let i = 0; i < 10; i++) {
+      this.result += "+"
+    }
+    this.getMemoryFromIndex(slot);
+    this.result += "]"
+    this.getMemoryFromIndex(slotBefore);
+    for (let i = 0; i < remainder; i++) {
+      this.result += "+"
+    }
+  }
+  writeMemoryArrayOptimized(arr, indexes) {
+    const min = Math.min(...arr);
+
+    const variableTemp = `translator_temp_line_${this.getTempIndex()}`;
+    this.createVar(variableTemp, min)
+    var slot = this.variables[variableTemp].memoryIndex;
+
+    this.getMemoryFromIndex(slot);
+
+    this.result += "["
+    for (let i = 0; i < arr.length; i++) {
+      this.getMemoryFromIndex(indexes[i]);
+      this.result += "+";
+    }
+    this.getMemoryFromIndex(slot);
+    this.result += "-";
+    this.result += "]";
+
+    for (let i = 0; i < arr.length; i++) {
+      this.getMemoryFromIndex(indexes[i]);
+      this.writeMemoryOptimized(arr[i] - min)
+    }
+    this.deleteVar(variableTemp);
+  }
+  AreEqual(left, right) {
+    var leftCopyName = this.createVarCopyPointersSafe(left);
+    var leftCopy = this.variables[leftCopyName];
+
+    var rightCopyName = this.createVarCopyPointersSafe(right);
+    var rightCopy = this.variables[rightCopyName];
+
+    this.getMemoryFromIndex(leftCopy.memoryIndex);
+    this.result += "[";
+    this.result += "-";
+    this.getMemoryFromIndex(rightCopy.memoryIndex);
+    this.result += "-";
+    this.getMemoryFromIndex(leftCopy.memoryIndex);
+    this.result += "]";
+    this.result += "+";
+    this.getMemoryFromIndex(rightCopy.memoryIndex);
+    this.result += "[";
+    this.getMemoryFromIndex(leftCopy.memoryIndex);
+    this.result += "-";
+    this.getMemoryFromIndex(rightCopy.memoryIndex);
+    this.result += "[";
+    this.result += "-";
+    this.result += "]";
+    this.result += "]";
+
+    this.deleteVar(rightCopyName);
+
+    return leftCopyName;
+  }
+
+  gen(child) {
+    switch (operators[0]) {
+      case "var": {
+        if (operators.length == 2) {
+          createVar(operators[1], 0)
+        } else if (operators.length == 3) {
+          if (!isNaN(operators[2])) {
+            operators[2] = Number(operators[2]);
+          }
+          console.log(`var ${operators[2]} is ${typeof operators[2]} type`);
+          createVar(operators[1], operators[2])
+        } else {
+          return `Error: wrong number of parameters in ${operators[0]} operator in ${i + 1} line.`;
+        }
+        break;
+      }
+      case "add": {
+        if (operators.length == 3) {
+          const variable = this.variables[operators[1]];
+          const variableAdd = this.variables[operators[2]];
+
+          if (variable.type != variableAdd.type) {
+            return `Error: different types on ${i + 1} line.`;
+          }
+
+          var copy = createVarCopyPointersSafe(operators[2]);
+
+          this.memory[variable.memoryIndex] = true;
+
+          var indexSlot = this.variables[copy].memoryIndex;
+          getMemoryFromIndex(indexSlot);
+          this.result += "[";
+          this.result += "-";
+          getMemoryFromIndex(variable.memoryIndex);
+          this.result += "+";
+          getMemoryFromIndex(indexSlot);
+          this.result += "]";
+
+          deleteVar(copy);
+        }
+        break;
+      }
+      case "out": {
+        if (operators.length == 2) {
+          const variable = operators[1];
+
+          if (this.variables[variable].type == "int8") {
+            getMemoryFromIndex(this.variables[variable].memoryIndex);
+            this.result += ".";
+          } else if (this.variables[variable].type == "string") {
+            for (let i = 0; i < this.variables[variable].memoryIndex.length; i++) {
+              const e = this.variables[variable].memoryIndex[i];
+              getMemoryFromIndex(e);
+              this.result += ".";
+            }
+          }
+        } else if (operators.length == 3 && operators[2] == "tostring") {
+          console.log("test");
+          const variable = operators[1];
+
+          if (this.variables[variable].type == "int8") {
+            getMemoryFromIndex(this.variables[variable].memoryIndex);
+
+            const varIndex = `translator_for_index_line_${i + 1}`;
+            createVar(varIndex, Number(48));
+            var indexator = this.variables[varIndex];
+
+            var copyName = createVarCopyPointersSafe(variable);
+            var copy = this.variables[copyName];
+        
+            getMemoryFromIndex(indexator.memoryIndex);
+            this.result += "[";
+            this.result += "-";
+            getMemoryFromIndex(copy.memoryIndex);
+            this.result += "+";
+            getMemoryFromIndex(indexator.memoryIndex);
+            this.result += "]";
+            getMemoryFromIndex(copy.memoryIndex);
+            this.result += ".";
+
+            deleteVar(varIndex);
+            deleteVar(copyName);
+          }
+        }
+        break;
+      }
+      case "if": {
+        if (operators.length == 4) {
+          const left = this.variables[operators[1]];
+          const op = operators[2];
+          const right = this.variables[operators[3]];
+
+          if (left.type != right.type) {
+            return `Error: different types on ${i + 1} line.`;
+          }
+
+          switch (op) {
+            case "=":
+              const boolName = AreEqual(operators[1], operators[3])
+              var bool = this.variables[boolName];
+
+              getMemoryFromIndex(bool.memoryIndex);
+              this.result += "[";
+              this.stackPointers.push({
+                ind: bool.memoryIndex,
+                name: boolName,
+              });
+              break;
+
+            default:
+              break;
+          }
+        }
+        break;
+      }
+      case "endif": {
+        let index = this.stackPointers[this.stackPointers.length - 1];
+
+        getMemoryFromIndex(index.ind);
+        deleteVar(index.name);
+        this.stackPointers.pop();
+        this.result += "-";
+        this.result += "]";
+        break;
+      }
+      case "for": {
+        if (operators.length == 2) {
+          const n = operators[1];
+
+          if (isNaN(n)) {
+            throw `Error: for index type not int8 on ${i + 1} line.`;
+          }
+
+          const varIndex = `translator_for_index_line_${i + 1}`;
+          createVar(varIndex, Number(n));
+          var indexator = this.variables[varIndex];
+
+          getMemoryFromIndex(indexator.memoryIndex);
+          this.result += "[";
+          this.stackPointers.push({
+            ind: indexator.memoryIndex,
+            name: varIndex,
+          });
+        }
+        break;
+      }
+      case "endfor": {
+        let index = this.stackPointers[this.stackPointers.length - 1];
+
+        getMemoryFromIndex(index.ind);
+        deleteVar(index.name);
+        this.stackPointers.pop();
+        this.result += "-";
+        this.result += "]";
+        break;
+      }
+      case "dump": {
+        this.result += "#";
+        break;
+      }
+      default: {
+        return `Error: undefined ${operators[0]} operator in ${i + 1} line.`;
+      }
+    }
+  }
+
+  compile(node) {
+    switch (node.type) {
+      case "set":
+        console.log(`create var`, node.childs);
+        this.createVar(node.childs[0].text, Number(node.childs[1].text));
+        break;
+      default:
+        for (let i = 0; i < node.childs.length; i++) {
+          const child = node.childs[i];
+
+          this.compile(child);
+        }
+        break;
+    }
+
+    return this.result
   }
 }
