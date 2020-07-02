@@ -33,8 +33,27 @@ function convert_new(src) {
 
   let bin = compiler.compile(node);
 
-  // return src;
-  return bin;
+  let binMin = LenOptimizer(bin);
+
+  console.log(`bin remove extra symbols: ${bin.length - binMin.length}`);
+
+  return binMin;
+}
+
+function LenOptimizer(src) {
+  let oldSrc;
+  do {
+    oldSrc = src;
+
+    src = src.replace('<>', '');
+    src = src.replace('><', '');
+
+    src = src.replace('+-', '');
+    src = src.replace('-+', '');
+
+  } while (oldSrc != src);
+
+  return src;
 }
 
 var iota_data = 0;
