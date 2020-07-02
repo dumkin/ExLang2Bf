@@ -1020,6 +1020,39 @@ class Compiler {
 
     return copyName;
   }
+  createVarCopyPointersSafeByMemory(name, index) {
+    const copyTempName = `translator_temp_${this.getTempIndex()}_byindex${index}_copy`;
+
+    this.createVar(name, 0);
+    this.createVar(copyTempName, 0);
+
+    var copy = this.variables[name];
+    var copyTemp = this.variables[copyTempName];
+
+    this.getMemoryFromIndex(index);
+    this.result += "[";
+    this.getMemoryFromIndex(copy.memoryIndex);
+    this.result += "+";
+    this.getMemoryFromIndex(copyTemp.memoryIndex);
+    this.result += "+";
+    this.getMemoryFromIndex(index);
+    this.result += "-";
+    this.result += "]";
+
+    this.getMemoryFromIndex(copyTemp.memoryIndex);
+    this.result += "[";
+    this.getMemoryFromIndex(index);
+    this.result += "+";
+    this.getMemoryFromIndex(copyTemp.memoryIndex);
+    this.result += "-";
+    this.result += "]";
+
+    this.memory[copy.memoryIndex] = true;
+
+    this.deleteVar(copyTempName);
+
+    return name;
+  }
   createVar_Int8(name, value) {
     if (!Number.isInteger(value)) {
       throw `variable int8 is not a integer - name: ${name}, value: ${value}`;
@@ -1315,7 +1348,76 @@ class Compiler {
     switch (node.type) {
       case "set":
         console.log(`create var`, node.childs);
+
+        if (node.childs[1].type === "plus") {
+          this.compile(node.childs[1]);
+
+          this.createVarCopyPointersSafeByMemory(node.childs[0].text, this.currentMemoryPointer);
+
+          return;
+        }
+        if (node.childs[1].type === "identifier") {
+          this.createVarCopyPointersSafe(node.childs[1].text);
+
+          return;
+        }
+
         this.createVar(node.childs[0].text, Number(node.childs[1].text));
+        break;
+      case "plus":
+        const first = node.childs[0];
+        const second = node.childs[1];
+
+        let firstVarName;
+        let secondVarName;
+
+        switch (first.type) {
+          case "identifier":
+            firstVarName = first.text;
+            break;
+          case "number":
+            firstVarName = `translator_temp_line_${this.getTempIndex()}`;
+            this.createVar(firstVarName, Number(first.text));
+            break;
+          default:
+            throw "unexpected type: " + first;
+        }
+
+        switch (second.type) {
+          case "identifier":
+            secondVarName = second.text;
+            break;
+          case "number":
+            secondVarName = `translator_temp_line_${this.getTempIndex()}`;
+            this.createVar(secondVarName, Number(second.text));
+            break;
+          default:
+            throw "unexpected type: " + second;
+        }
+
+        var copyFirst = this.createVarCopyPointersSafe(firstVarName);
+        var copySecond = this.createVarCopyPointersSafe(secondVarName);
+
+        var copyFirstIndexSlot = this.variables[copyFirst].memoryIndex;
+        var copySecondIndexSlot = this.variables[copySecond].memoryIndex;
+
+        this.getMemoryFromIndex(copySecondIndexSlot);
+        this.result += "[";
+        this.result += "-";
+        this.getMemoryFromIndex(copyFirstIndexSlot);
+        this.result += "+";
+        this.getMemoryFromIndex(copySecondIndexSlot);
+        this.result += "]";
+
+        this.deleteVar(copySecondIndexSlot);
+
+        // Положил сумму на вершину стека
+        this.getMemoryFromIndex(copyFirstIndexSlot);
+
+        break;
+      case "if":
+        // console.log(`create var`, node.childs);
+        // this.createVar(node.childs[0].text, Number(node.childs[1].text));
         break;
       default:
         for (let i = 0; i < node.childs.length; i++) {
