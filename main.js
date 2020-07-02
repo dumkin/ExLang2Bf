@@ -987,12 +987,16 @@ class Compiler {
   }
   createVarCopyPointersSafe(name) {
     const copyName = `translator_temp_${this.getTempIndex()}_${name}_copy`;
-    const copyTempName = `translator_temp_${this.getTempIndex()}_${name}_copy`;
+
+    return this.createVarCopyPointersSafeWithName(name, copyName);
+  }
+  createVarCopyPointersSafeWithName(originalName, copyName) {
+    const copyTempName = `translator_temp_${this.getTempIndex()}_${originalName}_copy`;
 
     this.createVar(copyName, 0);
     this.createVar(copyTempName, 0);
 
-    var orig = this.variables[name];
+    var orig = this.variables[originalName];
     var copy = this.variables[copyName];
     var copyTemp = this.variables[copyTempName];
 
@@ -1357,7 +1361,7 @@ class Compiler {
           return;
         }
         if (node.childs[1].type === "identifier") {
-          this.createVarCopyPointersSafe(node.childs[1].text);
+          this.createVarCopyPointersSafeWithName(node.childs[1].text, node.childs[0].text);
 
           return;
         }
