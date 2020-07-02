@@ -486,20 +486,19 @@ class TreeOut {
 }
 
 class Compiler {
-  pc = 0;
   result = "";
 
-
-  tempIndex = 0;
-  variables = {};
-  memory = {};
   currentMemoryPointer = 0;
   stackPointers = [];
 
-  getTempIndex() {
-    return this.tempIndex++;
+  iotaSecureIndex = 0;
+  getIotaSecureIndex() {
+    return this.iotaSecureIndex++;
   }
-  getMemoryFreeIndex() {
+
+  variables = {};
+  memory = {};
+  memoryGetFreeIndex() {
     const length = Object.keys(this.memory).length;
     for (let i = 0; i < length; i++) {
       if (!(i in this.memory)) {
@@ -508,7 +507,10 @@ class Compiler {
     }
     return length;
   }
-  getMemoryFromIndex(to) {
+  // memoryGetFreeArrayIndex() {}
+  memoryPointerByName(name) {
+    const to = this.variables[name].memoryIndex;
+
     for (let i = 0; i < Math.abs(this.currentMemoryPointer - to); i++) {
       if (this.currentMemoryPointer - to < 0) {
         this.result += ">";
@@ -518,179 +520,53 @@ class Compiler {
     }
     this.currentMemoryPointer = to;
   }
-  createVar(key, value) {
-    switch (typeof value) {
-      case "number":
-        this.createVar_Int8(key, value);
-        break;
-      case "string":
-        this.createVar_String(key, value);
-        break;
-      default:
-        throw `unsupported type (${value})`;
+  memoryPointerByIndex(to) {
+        for (let i = 0; i < Math.abs(this.currentMemoryPointer - to); i++) {
+      if (this.currentMemoryPointer - to < 0) {
+        this.result += ">";
+      } else {
+        this.result += "<";
+      }
     }
+    this.currentMemoryPointer = to;
   }
-  deleteVar(name) {
-    // const beforeIndex = this.currentMemoryPointer;
-
-    // this.result += "before";
-    // getMemoryFromIndex(this.variables[name].memoryIndex)
-    // this.result += "[-]";
-
-    delete this.variables[name];
-    delete this.memory[name];
-
-    //getMemoryFromIndex(beforeIndex)
-    //this.result += "after";
-  }
-  createVarCopy(name) {
-    const copyName = `translator_temp_${this.getTempIndex()}_${name}_copy`;
-    const newOrigName = `translator_temp_${this.getTempIndex()}_${name}_copy`;
-
-    this.createVar(copyName, 0);
-    this.createVar(newOrigName, 0);
-
-    var orig = this.variables[name];
-    var copy = this.variables[copyName];
-    var newOrig = this.variables[newOrigName];
-
-    this.getMemoryFromIndex(orig.memoryIndex);
-    this.result += "[";
-    this.getMemoryFromIndex(copy.memoryIndex);
-    this.result += "+";
-    this.getMemoryFromIndex(newOrig.memoryIndex);
-    this.result += "+";
-    this.getMemoryFromIndex(orig.memoryIndex);
-    this.result += "-";
-    this.result += "]";
-
-    this.memory[newOrig.memoryIndex] = true;
-    this.memory[copy.memoryIndex] = true;
-
-    orig.memoryIndex = newOrig.memoryIndex;
-
-    this.deleteVar(newOrigName);
-
-    return copyName;
-  }
-  createVarCopyPointersSafe(name) {
-    const copyName = `translator_temp_${this.getTempIndex()}_${name}_copy`;
-
-    return this.createVarCopyPointersSafeWithName(name, copyName);
-  }
-  createVarCopyPointersSafeWithName(originalName, copyName) {
-    const copyTempName = `translator_temp_${this.getTempIndex()}_${originalName}_copy`;
-
-    this.createVar(copyName, 0);
-    this.createVar(copyTempName, 0);
-
-    var orig = this.variables[originalName];
-    var copy = this.variables[copyName];
-    var copyTemp = this.variables[copyTempName];
-
-    this.getMemoryFromIndex(orig.memoryIndex);
-    this.result += "[";
-    this.getMemoryFromIndex(copy.memoryIndex);
-    this.result += "+";
-    this.getMemoryFromIndex(copyTemp.memoryIndex);
-    this.result += "+";
-    this.getMemoryFromIndex(orig.memoryIndex);
-    this.result += "-";
-    this.result += "]";
-
-    this.getMemoryFromIndex(copyTemp.memoryIndex);
-    this.result += "[";
-    this.getMemoryFromIndex(orig.memoryIndex);
-    this.result += "+";
-    this.getMemoryFromIndex(copyTemp.memoryIndex);
-    this.result += "-";
-    this.result += "]";
-
-    this.memory[copy.memoryIndex] = true;
-
-    this.deleteVar(copyTempName);
-
-    return copyName;
-  }
-  createVarCopyPointersSafeByMemory(name, index) {
-    const copyTempName = `translator_temp_${this.getTempIndex()}_byindex${index}_copy`;
-
-    this.createVar(name, 0);
-    this.createVar(copyTempName, 0);
-
-    var copy = this.variables[name];
-    var copyTemp = this.variables[copyTempName];
-
-    this.getMemoryFromIndex(index);
-    this.result += "[";
-    this.getMemoryFromIndex(copy.memoryIndex);
-    this.result += "+";
-    this.getMemoryFromIndex(copyTemp.memoryIndex);
-    this.result += "+";
-    this.getMemoryFromIndex(index);
-    this.result += "-";
-    this.result += "]";
-
-    this.getMemoryFromIndex(copyTemp.memoryIndex);
-    this.result += "[";
-    this.getMemoryFromIndex(index);
-    this.result += "+";
-    this.getMemoryFromIndex(copyTemp.memoryIndex);
-    this.result += "-";
-    this.result += "]";
-
-    this.memory[copy.memoryIndex] = true;
-
-    this.deleteVar(copyTempName);
-
-    return name;
-  }
-  createVar_Int8(name, value) {
-    if (!Number.isInteger(value)) {
-      throw `variable int8 is not a integer - name: ${name}, value: ${value}`;
-    }
-
-    const valueNormalized = value % 256;
-    const memoryIndex = this.getMemoryFreeIndex();
-
+  memoryAllocate(name, type, index) {
     this.variables[name] = {
-      memoryIndex: memoryIndex,
-      type: "int8"
+      memoryIndex: index,
+      type: type
     };
-    this.memory[memoryIndex] = true;
-
-    this.getMemoryFromIndex(memoryIndex);
-    this.writeMemoryOptimized(valueNormalized);
+    this.memory[index] = true;
   }
-  createVar_String(key, value) {
-    if (typeof value !== "string") {
-      throw `variable ${name} is not string (${value})`;
+  memoryFree(name, fillZero = false, safeCurrentPointer = false) {
+    const beforeIndex = this.currentMemoryPointer;
+    const v = this.variables[name];
+
+    if (fillZero) {
+      switch (v.type) {
+        case "int8":
+          this.memoryPointerByIndex(v.memoryIndex)
+          this.result += "[-]";
+          break;
+        default:
+          break;
+      }
     }
+    
+    delete this.variables[name];
+    delete this.memory[v.memoryIndex];
 
-    var memoryIndexes = [];
-    var chars = [];
-    for (let i = 0; i < value.length; i++) {
-      const memoryIndex = this.getMemoryFreeIndex();
-      memoryIndexes.push(memoryIndex);
-      chars.push(value.charCodeAt(i));
-      this.memory[memoryIndex] = true;
+    if (safeCurrentPointer) {
+      this.memoryPointerByIndex(beforeIndex);
     }
-
-    this.variables[key] = {
-      memoryIndex: memoryIndexes,
-      type: "string"
-    };
-
-    this.writeMemoryArrayOptimized(chars, memoryIndexes);
   }
-  writeMemoryLinear(value) {
+  memoryWriteLinear(value) {
     for (let i = 0; i < value; i++) {
       this.result += "+"
     }
   }
-  writeMemoryOptimized(value) {
+  memoryWriteOptimized(value) {
     if (value < 11) {
-      this.writeMemoryLinear(value);
+      this.memoryWriteLinear(value);
       return;
     }
 
@@ -698,48 +574,127 @@ class Compiler {
     var remainder = value % 10;
 
     const slotBefore = this.currentMemoryPointer;
-    const slot = this.getMemoryFreeIndex();
-    this.getMemoryFromIndex(slot);
+    const slot = this.memoryGetFreeIndex();
+    this.memoryPointerByIndex(slot);
     for (let i = 0; i < quotient; i++) {
       this.result += "+"
     }
     this.result += "["
     this.result += "-"
-    this.getMemoryFromIndex(slotBefore);
+    this.memoryPointerByIndex(slotBefore);
     for (let i = 0; i < 10; i++) {
       this.result += "+"
     }
-    this.getMemoryFromIndex(slot);
+    this.memoryPointerByIndex(slot);
     this.result += "]"
-    this.getMemoryFromIndex(slotBefore);
+    this.memoryPointerByIndex(slotBefore);
     for (let i = 0; i < remainder; i++) {
       this.result += "+"
     }
   }
-  writeMemoryArrayOptimized(arr, indexes) {
+  memoryWriteArrayOptimized(arr, indexes) {
     const min = Math.min(...arr);
 
-    const variableTemp = `translator_temp_line_${this.getTempIndex()}`;
+    const variableTemp = `_compiler_${this.getTempIndex()}`;
     this.createVar(variableTemp, min)
     var slot = this.variables[variableTemp].memoryIndex;
 
-    this.getMemoryFromIndex(slot);
+    this.memoryPointerByIndex(slot);
 
     this.result += "["
     for (let i = 0; i < arr.length; i++) {
-      this.getMemoryFromIndex(indexes[i]);
+      this.memoryPointerByIndex(indexes[i]);
       this.result += "+";
     }
-    this.getMemoryFromIndex(slot);
+    this.memoryPointerByIndex(slot);
     this.result += "-";
     this.result += "]";
 
     for (let i = 0; i < arr.length; i++) {
-      this.getMemoryFromIndex(indexes[i]);
-      this.writeMemoryOptimized(arr[i] - min)
+      this.memoryPointerByIndex(indexes[i]);
+      this.memoryWriteOptimized(arr[i] - min)
     }
-    this.deleteVar(variableTemp);
+    this.memoryFree(variableTemp, true, true);
   }
+
+  varCreate(name, value) {
+    switch (typeof value) {
+      case "number":
+        this.varCreate_Int8(name, value);
+        break;
+      case "string":
+        this.varCreate_String(name, value);
+        break;
+      default:
+        throw `unsupported type (${value})`;
+    }
+  }
+  varCopyByName(name, sourceName) {
+    this.varCopyByIndex(name, this.variables[sourceName].memoryIndex);
+  }
+  varCopyByIndex(name, sourceIndex) {
+    const copyTempName = `compilator_${this.getIotaSecureIndex()}`;
+
+    this.varCreate(name, 0);
+    this.varCreate(copyTempName, 0);
+
+    this.memoryPointerByIndex(sourceIndex);
+    this.result += "[";
+    this.memoryPointerByName(name);
+    this.result += "+";
+    this.memoryPointerByName(copyTempName);
+    this.result += "+";
+    this.memoryPointerByIndex(sourceIndex);
+    this.result += "-";
+    this.result += "]";
+
+    this.memoryPointerByName(copyTempName);
+    this.result += "[";
+    this.memoryPointerByIndex(sourceIndex);
+    this.result += "+";
+    this.memoryPointerByName(copyTempName);
+    this.result += "-";
+    this.result += "]";
+
+    this.memoryFree(copyTempName, true, true);
+  }
+
+  varCreate_Int8(name, value) {
+    if (!Number.isInteger(value)) {
+      throw `variable int8 is not a integer - name: ${name}, value: ${value}`;
+    }
+
+    const valueNormalized = value % 256;
+    const memoryIndex = this.memoryGetFreeIndex();
+
+    this.memoryAllocate(name, "int8", memoryIndex);
+
+    this.memoryPointerByIndex(memoryIndex);
+    this.memoryWriteOptimized(valueNormalized);
+  }
+  varCreate_String(name, value) {
+    throw "string var crreate does not work";
+    if (typeof value !== "string") {
+      throw `variable ${name} is not string (${value})`;
+    }
+
+    var memoryIndexes = [];
+    var chars = [];
+    for (let i = 0; i < value.length; i++) {
+      const memoryIndex = this.memoryGetFreeIndex();
+      memoryIndexes.push(memoryIndex);
+      chars.push(value.charCodeAt(i));
+      this.memory[memoryIndex] = true;
+    }
+
+    this.variables[name] = {
+      memoryIndex: memoryIndexes,
+      type: "string"
+    };
+
+    this.writeMemoryArrayOptimized(chars, memoryIndexes);
+  }
+  
   AreEqual(left, right) {
     var leftCopyName = this.createVarCopyPointersSafe(left);
     var leftCopy = this.variables[leftCopyName];
@@ -773,37 +728,43 @@ class Compiler {
   compile(node) {
     switch (node.type) {
       case "set":
-        console.log(`create var`, node.childs);
+        console.log(`create var ${node.childs[0].type}(${node.childs[0].text}) ${node.childs[1].type}(${node.childs[1].text})`);
 
         if (node.childs[1].type === "plus") {
           this.compile(node.childs[1]);
 
-          this.createVarCopyPointersSafeByMemory(node.childs[0].text, this.currentMemoryPointer);
+          this.varCopyByIndex(node.childs[0].text, this.currentMemoryPointer);
 
           return;
         }
         if (node.childs[1].type === "identifier") {
-          this.createVarCopyPointersSafeWithName(node.childs[1].text, node.childs[0].text);
+          this.varCopyByName(node.childs[0].text, node.childs[1].text);
 
           return;
         }
 
-        this.createVar(node.childs[0].text, Number(node.childs[1].text));
+        this.varCreate(node.childs[0].text, Number(node.childs[1].text));
         break;
       case "plus":
         const first = node.childs[0];
         const second = node.childs[1];
 
+        console.log(`plus ${first.type}(${first.text}) ${second.type}(${second.text})`);
+
         let firstVarName;
         let secondVarName;
+
+        let firstVarForRemove = false;
+        let secondVarForRemove = false;
 
         switch (first.type) {
           case "identifier":
             firstVarName = first.text;
             break;
           case "number":
-            firstVarName = `translator_temp_line_${this.getTempIndex()}`;
-            this.createVar(firstVarName, Number(first.text));
+            firstVarName = `translator_temp_line_${this.getIotaSecureIndex()}`;
+            this.varCreate(firstVarName, Number(first.text));
+            firstVarForRemove = true;
             break;
           default:
             throw "unexpected type: " + first;
@@ -814,31 +775,42 @@ class Compiler {
             secondVarName = second.text;
             break;
           case "number":
-            secondVarName = `translator_temp_line_${this.getTempIndex()}`;
-            this.createVar(secondVarName, Number(second.text));
+            secondVarName = `translator_temp_line_${this.getIotaSecureIndex()}`;
+            this.varCreate(secondVarName, Number(second.text));
+            secondVarForRemove = true;
             break;
           default:
             throw "unexpected type: " + second;
         }
 
-        var copyFirst = this.createVarCopyPointersSafe(firstVarName);
-        var copySecond = this.createVarCopyPointersSafe(secondVarName);
+        const copyFirstName = `compilator_${this.getIotaSecureIndex()}`;
+        const copySecondName = `compilator_${this.getIotaSecureIndex()}`;
 
-        var copyFirstIndexSlot = this.variables[copyFirst].memoryIndex;
-        var copySecondIndexSlot = this.variables[copySecond].memoryIndex;
+        this.varCopyByName(copyFirstName, firstVarName);
+        this.varCopyByName(copySecondName, secondVarName);
 
-        this.getMemoryFromIndex(copySecondIndexSlot);
+        var copyFirstIndexSlot = this.variables[copyFirstName].memoryIndex;
+        var copySecondIndexSlot = this.variables[copySecondName].memoryIndex;
+
+        this.memoryPointerByIndex(copySecondIndexSlot);
         this.result += "[";
         this.result += "-";
-        this.getMemoryFromIndex(copyFirstIndexSlot);
+        this.memoryPointerByIndex(copyFirstIndexSlot);
         this.result += "+";
-        this.getMemoryFromIndex(copySecondIndexSlot);
+        this.memoryPointerByIndex(copySecondIndexSlot);
         this.result += "]";
 
-        this.deleteVar(copySecondIndexSlot);
+        // this.memoryFree(copyFirstName); // TODO: лупится, WTF?
+        this.memoryFree(copySecondName, true, true);
+        if (firstVarForRemove) {
+          this.memoryFree(firstVarName, true, true);
+        }
+        if (secondVarForRemove) {
+          this.memoryFree(secondVarName, true, true);
+        }
 
         // Положил сумму на вершину стека
-        this.getMemoryFromIndex(copyFirstIndexSlot);
+        this.memoryPointerByIndex(copyFirstIndexSlot);
 
         break;
       case "if":
