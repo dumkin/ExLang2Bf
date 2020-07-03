@@ -1,6 +1,6 @@
 'use strict';
 
-document.querySelector("#convert_new").onclick = function() {
+document.querySelector("#convert_new").onclick = function () {
   var src = document.querySelector("#src_new").value;
   var bf = convert_new(src);
   document.querySelector("#bf_new").value = bf;
@@ -75,9 +75,10 @@ const Tokens = {
   "paren_right": iota(),
 
   "semicolon": iota(),
-  "equal": iota(),
+  "assign": iota(),
   "plus": iota(),
   "minus": iota(),
+  "equal": iota(),
   "less": iota(),
 
   "if": iota(),
@@ -93,7 +94,7 @@ function getToken(code, index) {
     index: index,
     next: index + 1,
     token: "undefined",
-    value: ""
+    value: null
   };
 
   while (code.length > index && isSpace(code[index])) {
@@ -138,8 +139,13 @@ function getToken(code, index) {
   }
 
   if (code[index] == '=') {
+    if (code.length > index + 1 && code[index + 1] == "=") {
+      result.next = index + 2;
+      result.token = "equal";
+      return result;
+    }
     result.next = index + 1;
-    result.token = "equal";
+    result.token = "assign";
     return result;
   }
 
@@ -367,6 +373,16 @@ class SyntaxParser {
       return lessNode;
     }
 
+    if (this.currentToken() === "equal") {
+      console.log(`find token equal`);
+      this.index++;
+
+      let equalNode = new AstNode("equal", null, node, this.Summa());
+
+      console.groupEnd();
+      return equalNode;
+    }
+
     console.groupEnd();
     return node;
   }
@@ -381,7 +397,8 @@ class SyntaxParser {
 
     let node = this.Test();
 
-    if (this.currentToken() === "equal" && node.type === "identifier") {
+    if (this.currentToken() === "assign" && node.type === "identifier") {
+      console.log(`find token assign`);
       this.index++;
       let setNode = new AstNode("set", null, node, this.Expression());
 
@@ -496,7 +513,7 @@ class SyntaxParser {
   }
 
   parse() {
-    console.group("parse");
+    console.groupCollapsed("parse");
     // while (this.NotEndTokens() && this.tokens[this.index].token !== "eof") {
     this.root.AddChild(this.Statement());
     console.groupEnd();

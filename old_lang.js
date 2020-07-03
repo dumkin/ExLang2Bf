@@ -332,7 +332,7 @@ function convert(src) {
 
             var copyName = createVarCopyPointersSafe(variable);
             var copy = variables[copyName];
-        
+
             getMemoryFromIndex(indexator.memoryIndex);
             result += "[";
             result += "-";

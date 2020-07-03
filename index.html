@@ -41,9 +41,11 @@ out k
   c = 5 + 5;
   d = c;
   e = 1 + d;
-  if (10 < a)
+  if (10 == a)
+    a = 44;
+  else if (10 < a) {
     a = 33;
-  else {
+  } else {
     a = 1;
     b = 2;
   }
