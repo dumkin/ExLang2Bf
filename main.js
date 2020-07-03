@@ -1,6 +1,6 @@
 'use strict';
 
-document.querySelector("#convert_new").onclick = function () {
+document.querySelector("#convert_new").onclick = function() {
   var src = document.querySelector("#src_new").value;
   var bf = convert_new(src);
   document.querySelector("#bf_new").value = bf;
@@ -83,6 +83,7 @@ const Tokens = {
   "if": iota(),
   "else": iota(),
   "while": iota(),
+  "func": iota(),
 
   "eof": iota()
 };
@@ -189,6 +190,11 @@ function getToken(code, index) {
 
     result.next = index + offset;
 
+    if (value == "func") {
+      result.token = "func";
+      return result;
+    }
+
     if (value == "if") {
       result.token = "if";
       return result;
@@ -288,23 +294,45 @@ class SyntaxParser {
     this.root = new AstNode("root", null, null, null);
   }
 
-  Term() {
+  Identifier() {
+    console.group("Identifier");
     let node = null;
-    
+
+    if (this.currentToken() != "identifier") {
+      throw "expected identifier";
+    }
+
+    console.log("find identifier: ", this.tokens[this.index].value);
+    node = new AstNode("identifier", this.tokens[this.index].value, null, null);
+    this.index++;
+
+    console.groupEnd();
+    return node;
+  }
+
+  Term() {
+    console.group("Term");
+    let node = null;
+
     if (this.currentToken() == "identifier") {
-      node = new AstNode("identifier", this.tokens[this.index].value, null, null);
-      this.index++;
+      node = this.Identifier();
+      // console.log("find identifier: ", this.tokens[this.index].value);
+      // node = new AstNode("identifier", this.tokens[this.index].value, null, null);
+      // this.index++;
     } else if (this.currentToken() == "number") {
+      console.log("find number: ", this.tokens[this.index].value);
       node = new AstNode("number", this.tokens[this.index].value, null, null);
       this.index++;
     } else {
       node = this.ExpressionParen();
     }
 
+    console.groupEnd();
     return node;
   }
 
   Summa() {
+    console.group("Summa");
     let node = this.Term();
     let kindType = null;
 
@@ -317,29 +345,38 @@ class SyntaxParser {
 
       this.index++;
 
+      console.log(`find token ${kindType}`);
       node = new AstNode(kindType, null, node, this.Term());
     }
 
+    console.groupEnd();
     return node;
   }
 
   Test() {
+    console.group("Test");
     let node = this.Summa();
 
     if (this.currentToken() === "less") {
+      console.log(`find token less`);
       this.index++;
 
       let lessNode = new AstNode("less", null, node, this.Summa());
 
+      console.groupEnd();
       return lessNode;
     }
-    
+
+    console.groupEnd();
     return node;
   }
 
   Expression() {
+    console.group("Expression");
     if (this.currentToken() !== "identifier") {
-      return this.Test();
+      let node = this.Test();
+      console.groupEnd();
+      return node;
     }
 
     let node = this.Test();
@@ -348,13 +385,16 @@ class SyntaxParser {
       this.index++;
       let setNode = new AstNode("set", null, node, this.Expression());
 
+      console.groupEnd();
       return setNode;
     }
 
+    console.groupEnd();
     return node;
   }
 
   ExpressionParen() {
+    console.group("ExpressionParen");
     if (this.currentToken() !== "paren_left") {
       throw '"(" expected';
     }
@@ -367,13 +407,26 @@ class SyntaxParser {
     }
     this.index++;
 
+    console.groupEnd();
     return node;
   }
 
   Statement() {
     let node = null;
-    
-    if (this.currentToken() == "if") {
+
+    if (this.currentToken() == "func") {
+      console.group("func");
+      let ifNode = new AstNode("func", null, null, null);
+      this.index++;
+
+      ifNode.AddChild(this.Identifier());
+      ifNode.AddChild(this.ExpressionParen());
+      ifNode.AddChild(this.Statement());
+
+      node = ifNode;
+      console.groupEnd();
+    } else if (this.currentToken() == "if") {
+      console.group("if");
       let ifNode = new AstNode("if", null, null, null);
       this.index++;
 
@@ -381,29 +434,35 @@ class SyntaxParser {
       ifNode.AddChild(this.Statement());
 
       if (this.currentToken() == "else") {
+        console.group("else");
         let elseNode = new AstNode("else", null, null, null);
         this.index++;
 
         elseNode.AddChild(this.Statement());
 
         ifNode.AddChild(elseNode);
+        console.groupEnd();
       }
 
       node = ifNode;
+      console.groupEnd();
     } else if (this.currentToken() == "while") {
 
     } else if (this.currentToken() == "do") {
 
     } else if (this.currentToken() == "semicolon") {
+      console.group("semicolon");
       node = new AstNode("empty(semicolon)", null, null, null);
       this.index++;
+      console.groupEnd();
     } else if (this.currentToken() == "brace_left") {
+      console.group("brace_left");
       node = new AstNode("EMPTY", null, null, null);
       this.index++;
 
       // const paramsOffset = this.WaitWithStack("brace_right", "brace_left", "brace_right");
       // let endIndex = this.index + paramsOffset;
-  
+
       // while (this.index < endIndex && this.NotEndTokens()) {
       //   node = new AstNode("SEQ", null, node, this.Statement());
       // }
@@ -411,11 +470,13 @@ class SyntaxParser {
         node = new AstNode("SEQ", null, node, this.Statement());
       }
       this.index++;
-  
+
       // if (this.index != endIndex) {
       //   console.log("wtf");
       // }
+      console.groupEnd();
     } else {
+      console.group("Another Statement");
       node = new AstNode("expression", null, null, null);
       node.AddChild(this.Expression());
 
@@ -424,6 +485,7 @@ class SyntaxParser {
       }
 
       this.index++;
+      console.groupEnd();
     }
 
     return node;
@@ -434,8 +496,10 @@ class SyntaxParser {
   }
 
   parse() {
+    console.group("parse");
     // while (this.NotEndTokens() && this.tokens[this.index].token !== "eof") {
     this.root.AddChild(this.Statement());
+    console.groupEnd();
     // }
 
     // if (this.tokens[this.index].token !== "eof") {
@@ -473,7 +537,7 @@ class TreeOut {
       result += ` (${node.text})`;
     }
     result += "\n";
-    
+
     for (let i = 0; i < node.childs.length; i++) {
       result += this.PrintSub(node.GetChild(i), indent, false);
     }
@@ -521,7 +585,7 @@ class Compiler {
     this.currentMemoryPointer = to;
   }
   memoryPointerByIndex(to) {
-        for (let i = 0; i < Math.abs(this.currentMemoryPointer - to); i++) {
+    for (let i = 0; i < Math.abs(this.currentMemoryPointer - to); i++) {
       if (this.currentMemoryPointer - to < 0) {
         this.result += ">";
       } else {
@@ -551,7 +615,7 @@ class Compiler {
           break;
       }
     }
-    
+
     delete this.variables[name];
     delete this.memory[v.memoryIndex];
 
@@ -694,7 +758,7 @@ class Compiler {
 
     this.writeMemoryArrayOptimized(chars, memoryIndexes);
   }
-  
+
   AreEqual(left, right) {
     var leftCopyName = this.createVarCopyPointersSafe(left);
     var leftCopy = this.variables[leftCopyName];
@@ -727,6 +791,8 @@ class Compiler {
 
   compile(node) {
     switch (node.type) {
+      case "func":
+        break;
       case "set":
         console.log(`create var ${node.childs[0].type}(${node.childs[0].text}) ${node.childs[1].type}(${node.childs[1].text})`);
 
