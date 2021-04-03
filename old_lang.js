@@ -1,12 +1,12 @@
 'use strict';
 
-document.querySelector("#convert").onclick = function () {
-  var src = document.querySelector("#src").value;
-  var bf = convert(src);
-  document.querySelector("#bf").value = bf;
+document.querySelector("#convert_old").onclick = function () {
+  var src = document.querySelector("#src_old").value;
+  var bf = convert_old(src);
+  document.querySelector("#bf_old").value = bf;
 }
 
-function convert(src) {
+function convert_old(src) {
   var lines = src.split("\n");
   var result = "";
 

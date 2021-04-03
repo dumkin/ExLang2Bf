@@ -5,33 +5,32 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>Document</title>
+  <title>ExLang2Bf</title>
 </head>
 
 <body>
-<textarea id="src" cols="30" rows="20">
-var qwe
-var ad 10
-for 5
-  add qwe ad
-endfor
 
-var res 50
-if qwe = res
-  var asd Work
-  out asd
-endif
-
-var k End
-out k    
-</textarea>
+  <textarea id="src" cols="40" rows="30">
+a = 5;
+c = 5 + 5;
+c1 = 10;
+c2 = 5;
+c3 = c1 / c2;
+d = c;
+e = 1 + d;
+k = "1 + d";
+out(k);
+w_1 = 50;
+w2 = w_1 + 5;
+out(w2);
+  </textarea>
   <button id="convert">Convert</button>
-  <textarea id="bf" cols="40" rows="20"></textarea>
+  <textarea id="bf" cols="40" rows="30"></textarea>
 
-  <br>
-  <br>
+  <script src="new.js"></script>
+</body>
 
-<textarea id="src_new" cols="30" rows="30">
+<!-- 
 {
   func test(a) {
     k = a;
@@ -41,6 +40,7 @@ out k
   c = 5 + 5;
   d = c;
   e = 1 + d;
+  out(e);
   if (10 == a)
     a = 44;
   else if (10 < a) {
@@ -50,12 +50,6 @@ out k
     b = 2;
   }
 }
-</textarea>
-  <button id="convert_new">Convert</button>
-  <textarea id="bf_new" cols="40" rows="30"></textarea>
-
-  <script src="main.js"></script>
-  <script src="old_lang.js"></script>
-</body>
+ -->
 
 </html>
